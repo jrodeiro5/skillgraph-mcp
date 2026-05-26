@@ -28,7 +28,7 @@ type options struct {
 
 func parseFlags(args []string) options {
 	var opts options
-	fs := flag.NewFlagSet("skillful-mcp", flag.ExitOnError)
+	fs := flag.NewFlagSet("skillgraph-mcp", flag.ExitOnError)
 	fs.StringVar(&opts.configPath, "config", "./mcp.json", "Path to MCP config file")
 	fs.StringVar(&opts.transport, "transport", "stdio", "Upstream transport: stdio or http")
 	fs.StringVar(&opts.host, "host", "localhost", "HTTP host (when transport=http)")

@@ -17,7 +17,7 @@ import (
 // NewServer creates an MCP server with all tools registered.
 func NewServer(mgr *mcpserver.Manager) *mcp.Server {
 	s := mcp.NewServer(&mcp.Implementation{
-		Name:    "skillful-mcp",
+		Name:    "skillgraph-mcp",
 		Version: version.Version,
 	}, nil)
 

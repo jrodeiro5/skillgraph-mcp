@@ -24,7 +24,7 @@ type Server struct {
 // (description override, tool/resource allowlists).
 func NewServer(ctx context.Context, srv config.Server) (*Server, error) {
 	client := mcp.NewClient(&mcp.Implementation{
-		Name:    "skillful-mcp",
+		Name:    "skillgraph-mcp",
 		Version: version.Version,
 	}, nil)
 

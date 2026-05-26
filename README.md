@@ -1,13 +1,13 @@
-# skillful-mcp
+# skillgraph-mcp
 
-[![Go](https://img.shields.io/github/go-mod/go-version/kurtisvg/skillful-mcp)](https://go.dev/)
-[![CI](https://github.com/kurtisvg/skillful-mcp/actions/workflows/test.yml/badge.svg)](https://github.com/kurtisvg/skillful-mcp/actions/workflows/test.yml)
-[![Go Report Card](https://goreportcard.com/badge/github.com/kurtisvg/skillful-mcp)](https://goreportcard.com/report/github.com/kurtisvg/skillful-mcp)
+[![Go](https://img.shields.io/github/go-mod/go-version/jrodeiro5/skillgraph-mcp)](https://go.dev/)
+[![CI](https://github.com/jrodeiro5/skillgraph-mcp/actions/workflows/test.yml/badge.svg)](https://github.com/jrodeiro5/skillgraph-mcp/actions/workflows/test.yml)
+[![Go Report Card](https://goreportcard.com/badge/github.com/jrodeiro5/skillgraph-mcp)](https://goreportcard.com/report/github.com/jrodeiro5/skillgraph-mcp)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 Too many MCP tools slowing your agent down? Might be a Skill Issue 😉
 
-**skillful-mcp** eliminates tool bloat by turning your MCP servers into Agent Skills in an MCP-native way.
+**skillgraph-mcp** eliminates tool bloat by building a semantic capability relationship graph and turning your MCP servers into Agent Skills in an MCP-native way.
 
 - 🔍 **Progressive Disclosure** — start with 4 tools, discover more as needed
 - ⚡ **Code Mode** — trigger and combine multiple tool calls with Python
@@ -28,7 +28,7 @@ Connecting an agent to too many tools (or MCP servers) creates
 loaded into its context window before the user says a word. Accuracy drops,
 latency increases, and adding capabilities makes the agent worse.
 
-skillful-mcp fixes this through **progressive disclosure**. The agent sees just 4
+skillgraph-mcp fixes this through **progressive disclosure**. The agent sees just 4
 tools and discovers specific schemas on-demand, collapsing thousands of tokens
 down to a lightweight index.
 
@@ -37,12 +37,12 @@ down to a lightweight index.
 ## 💡 How it works
 
 ```
-Agent  <--MCP-->  skillful-mcp  <--MCP-->  Database Server
+Agent  <--MCP-->  skillgraph-mcp  <--MCP-->  Database Server
                                 <--MCP-->  Filesystem Server
                                 <--MCP-->  API Server
 ```
 
-skillful-mcp reads a standard `mcp.json` config, connects to each downstream
+skillgraph-mcp reads a standard `mcp.json` config, connects to each downstream
 server, and exposes seven tools:
 
 | Tool              | Description                                                                      |
@@ -100,11 +100,11 @@ VERSION="0.0.1"
 OS="linux"       # or: darwin, windows
 ARCH="amd64"     # or: arm64
 
-curl -L "https://github.com/kurtisvg/skillful-mcp/releases/download/v${VERSION}/skillful-mcp_${VERSION}_${OS}_${ARCH}" -o skillful-mcp
-chmod +x skillful-mcp
+curl -L "https://github.com/jrodeiro5/skillgraph-mcp/releases/download/v${VERSION}/skillgraph-mcp_${VERSION}_${OS}_${ARCH}" -o skillgraph-mcp
+chmod +x skillgraph-mcp
 ```
 
-Or download from the [releases page](https://github.com/kurtisvg/skillful-mcp/releases/latest).
+Or download from the [releases page](https://github.com/jrodeiro5/skillgraph-mcp/releases/latest).
 
 </details>
 
@@ -114,7 +114,7 @@ Or download from the [releases page](https://github.com/kurtisvg/skillful-mcp/re
 ```sh
 docker run --rm \
   -v /path/to/mcp.json:/mcp.json \
-  ghcr.io/kurtisvg/skillful-mcp:latest \
+  ghcr.io/jrodeiro5/skillgraph-mcp:latest \
   --config /mcp.json --transport http --port 8080
 ```
 </details>
@@ -123,7 +123,7 @@ docker run --rm \
 <summary><strong>Go install</strong> (requires Go 1.25+)</summary>
 
 ```sh
-go install github.com/kurtisvg/skillful-mcp@latest
+go install github.com/jrodeiro5/skillgraph-mcp@latest
 ```
 </details>
 
@@ -131,9 +131,9 @@ go install github.com/kurtisvg/skillful-mcp@latest
 <summary><strong>Build from source</strong></summary>
 
 ```sh
-git clone https://github.com/kurtisvg/skillful-mcp.git
-cd skillful-mcp
-go build -o skillful-mcp .
+git clone https://github.com/jrodeiro5/skillgraph-mcp.git
+cd skillgraph-mcp
+go build -o skillgraph-mcp .
 ```
 </details>
 
@@ -170,13 +170,13 @@ Create an `mcp.json` file with your downstream servers:
 ### Run
 
 ```sh
-skillful-mcp --config mcp.json
+skillgraph-mcp --config mcp.json
 ```
 
 Or over HTTP:
 
 ```sh
-skillful-mcp --config mcp.json --transport http --port 8080
+skillgraph-mcp --config mcp.json --transport http --port 8080
 ```
 
 ### Connect to your agent
@@ -188,7 +188,7 @@ skillful-mcp --config mcp.json --transport http --port 8080
 {
   "mcpServers": {
     "skillful": {
-      "command": "/path/to/skillful-mcp",
+      "command": "/path/to/skillgraph-mcp",
       "args": ["--config", "/path/to/mcp.json"]
     }
   }
@@ -203,7 +203,7 @@ skillful-mcp --config mcp.json --transport http --port 8080
 {
   "mcpServers": {
     "skillful": {
-      "command": "/path/to/skillful-mcp",
+      "command": "/path/to/skillgraph-mcp",
       "args": ["--config", "/path/to/mcp.json"]
     }
   }
@@ -216,12 +216,12 @@ skillful-mcp --config mcp.json --transport http --port 8080
 
 ```toml
 [mcp_servers.skillful]
-command = "/path/to/skillful-mcp"
+command = "/path/to/skillgraph-mcp"
 args = ["--config", "/path/to/mcp.json"]
 ```
 </details>
 
-Any MCP-compatible client works — just point it at the `skillful-mcp` binary.
+Any MCP-compatible client works — just point it at the `skillgraph-mcp` binary.
 
 ### Advanced example: GitHub MCP Server
 

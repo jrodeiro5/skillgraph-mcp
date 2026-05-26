@@ -1,0 +1,34 @@
+# Binaries
+skillful-mcp
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Test and coverage
+*.out
+*.test
+*.prof
+
+# OS / Editor
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Credentials & Local Config
+.env
+*.key
+*token*
+passwd
+pass/
+*secret*
+config_local.json
+mcp_local.json
+deepseek_key*
+*.log
+
+# Generated files
+.mcp_lattice/

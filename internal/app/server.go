@@ -25,6 +25,9 @@ func NewServer(mgr *mcpserver.Manager) *mcp.Server {
 	tools.RegisterUseSkill(s, mgr)
 	tools.RegisterReadResource(s, mgr)
 	tools.RegisterExecuteCode(s, mgr)
+	tools.RegisterGetSkillGraph(s, mgr)
+	tools.RegisterPlanWorkflow(s, mgr)
+	tools.RegisterReadLattice(s, mgr)
 
 	return s
 }

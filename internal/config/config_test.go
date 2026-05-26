@@ -105,7 +105,7 @@ func TestLoad(t *testing.T) {
 				path = writeTestConfig(t, tt.json)
 			}
 
-			servers, err := Load(path)
+			servers, _, err := Load(path)
 			if tt.wantErr {
 				if err == nil {
 					t.Fatal("expected error, got nil")
@@ -145,7 +145,7 @@ func TestLoadedFieldValues(t *testing.T) {
 		}
 	}`
 	path := writeTestConfig(t, jsonStr)
-	servers, err := Load(path)
+	servers, _, err := Load(path)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -216,7 +216,7 @@ func TestServerOptions(t *testing.T) {
 		}
 	}`
 	path := writeTestConfig(t, jsonStr)
-	servers, err := Load(path)
+	servers, _, err := Load(path)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -274,7 +274,7 @@ func TestEnvVarExpansion(t *testing.T) {
 		}
 	}`
 	path := writeTestConfig(t, jsonStr)
-	servers, err := Load(path)
+	servers, _, err := Load(path)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -320,7 +320,7 @@ func TestEnvVarExpansionMissingVar(t *testing.T) {
 		}
 	}`
 	path := writeTestConfig(t, jsonStr)
-	_, err := Load(path)
+	_, _, err := Load(path)
 	if err == nil {
 		t.Fatal("expected error for missing env var")
 	}
@@ -338,7 +338,7 @@ func TestEnvVarNoExpansionWithoutBraces(t *testing.T) {
 		}
 	}`
 	path := writeTestConfig(t, jsonStr)
-	servers, err := Load(path)
+	servers, _, err := Load(path)
 	if err != nil {
 		t.Fatal(err)
 	}

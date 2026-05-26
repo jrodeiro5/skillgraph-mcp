@@ -10,7 +10,9 @@ import (
 
 	"github.com/kurtisvg/skillful-mcp/internal/app"
 	"github.com/kurtisvg/skillful-mcp/internal/config"
+	"github.com/kurtisvg/skillful-mcp/internal/docs"
 	"github.com/kurtisvg/skillful-mcp/internal/mcpserver"
+	"github.com/kurtisvg/skillful-mcp/internal/refine"
 	"github.com/kurtisvg/skillful-mcp/internal/version"
 
 	flag "github.com/spf13/pflag"
@@ -49,7 +51,7 @@ func Execute() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	servers, err := config.Load(opts.configPath)
+	servers, graphCfg, err := config.Load(opts.configPath)
 	if err != nil {
 		slog.Error("failed to load config", "error", err)
 		os.Exit(1)
@@ -67,7 +69,7 @@ func Execute() {
 		}
 	}
 
-	mgr, err := mcpserver.NewManager(ctx, servers)
+	mgr, err := mcpserver.NewManager(ctx, servers, graphCfg)
 	if err != nil {
 		slog.Error("failed to connect to servers", "error", err)
 		os.Exit(1)
@@ -75,6 +77,15 @@ func Execute() {
 	defer mgr.Close()
 
 	slog.Info("connected to servers", "servers", mgr.ListServerNames())
+
+	// Generate the semantic markdown documentation lattice
+	latticeDir := "./.mcp_lattice"
+	if err := docs.GenerateLattice(ctx, latticeDir, servers, mgr.GetGraph()); err != nil {
+		slog.Warn("failed to generate semantic lattice", "error", err)
+	}
+
+	// Trigger asynchronous LLM metadata refinement for new/undescribed servers
+	refine.StartRefinementLoop(ctx, opts.configPath, mgr, latticeDir, servers)
 
 	s := app.NewServer(mgr)
 	var serveErr error

@@ -22,33 +22,51 @@ type Server interface {
 	Options() ServerOptions
 }
 
-func Load(path string) (map[string]Server, error) {
+type StaticRelation struct {
+	Source      string `json:"source"`
+	Target      string `json:"target"`
+	Type        string `json:"type"`
+	Description string `json:"description,omitempty"`
+}
+
+type SkillGraphConfig struct {
+	Relations    []StaticRelation  `json:"relations"`
+	Descriptions map[string]string `json:"descriptions,omitempty"`
+}
+
+func Load(path string) (map[string]Server, *SkillGraphConfig, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
-		return nil, fmt.Errorf("reading config file: %w", err)
+		return nil, nil, fmt.Errorf("reading config file: %w", err)
 	}
 
 	var raw struct {
 		MCPServers map[string]json.RawMessage `json:"mcpServers"`
+		SkillGraph *SkillGraphConfig          `json:"skillGraph,omitempty"`
 	}
 	if err := json.Unmarshal(data, &raw); err != nil {
-		return nil, fmt.Errorf("parsing config file: %w", err)
+		return nil, nil, fmt.Errorf("parsing config file: %w", err)
 	}
 
 	servers := make(map[string]Server, len(raw.MCPServers))
 	for name, rawSrv := range raw.MCPServers {
 		expanded, err := expandRawJSON(rawSrv)
 		if err != nil {
-			return nil, fmt.Errorf("server %q: %w", name, err)
+			return nil, nil, fmt.Errorf("server %q: %w", name, err)
 		}
 
 		srv, err := unmarshalServer(expanded)
 		if err != nil {
-			return nil, fmt.Errorf("server %q: %w", name, err)
+			return nil, nil, fmt.Errorf("server %q: %w", name, err)
 		}
 		servers[name] = srv
 	}
-	return servers, nil
+
+	if raw.SkillGraph == nil {
+		raw.SkillGraph = &SkillGraphConfig{Relations: []StaticRelation{}}
+	}
+
+	return servers, raw.SkillGraph, nil
 }
 
 func unmarshalServer(data []byte) (Server, error) {

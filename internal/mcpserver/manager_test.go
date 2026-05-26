@@ -2,6 +2,8 @@ package mcpserver
 
 import (
 	"testing"
+
+	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
 func TestGetServer(t *testing.T) {
@@ -148,4 +150,94 @@ func TestManagerClose(t *testing.T) {
 	// Should not panic on multiple closes.
 	m.Close()
 	m.Close()
+}
+
+func TestManagerGraph(t *testing.T) {
+	t.Parallel()
+	ctx := t.Context()
+
+	session := startFakeServer(t, ctx, nil, nil)
+	srv, err := NewServerFromSession(ctx, session)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer srv.Close()
+
+	// Inject custom tools to test semantic inference
+	srv.tools = []*mcp.Tool{
+		{
+			Name:        "create_issue",
+			Description: "Create a new issue",
+			InputSchema: map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"title": map[string]any{"type": "string"},
+				},
+			},
+		},
+		{
+			Name:        "comment_on_issue",
+			Description: "Add a comment",
+			InputSchema: map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"issue_id": map[string]any{"type": "integer"},
+					"body":     map[string]any{"type": "string"},
+				},
+				"required": []any{"issue_id"},
+			},
+		},
+	}
+
+	m, err := NewManagerFromServers(map[string]*Server{"github": srv})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	g := m.GetGraph()
+	if g == nil {
+		t.Fatal("expected non-nil graph")
+	}
+
+	// Verify Skill node is present
+	skillNode, ok := g.Nodes["github"]
+	if !ok || skillNode.Type != "skill" {
+		t.Error("missing skill node 'github'")
+	}
+
+	// Verify Tool nodes are present
+	if _, ok := g.Nodes["create_issue"]; !ok {
+		t.Error("missing tool node 'create_issue'")
+	}
+	if _, ok := g.Nodes["comment_on_issue"]; !ok {
+		t.Error("missing tool node 'comment_on_issue'")
+	}
+
+	// Verify HAS_TOOL relations
+	hasCreate := false
+	hasComment := false
+	hasInferred := false
+
+	for _, edge := range g.Edges {
+		if edge.Source == "github" && edge.Target == "create_issue" && edge.Type == "HAS_TOOL" {
+			hasCreate = true
+		}
+		if edge.Source == "github" && edge.Target == "comment_on_issue" && edge.Type == "HAS_TOOL" {
+			hasComment = true
+		}
+		// Verify inferred RelPrerequisiteFor relation (create_issue -> comment_on_issue)
+		if edge.Source == "create_issue" && edge.Target == "comment_on_issue" && edge.Type == "PREREQUISITE_FOR" {
+			hasInferred = true
+		}
+	}
+
+	if !hasCreate {
+		t.Error("missing edge 'github -HAS_TOOL-> create_issue'")
+	}
+	if !hasComment {
+		t.Error("missing edge 'github -HAS_TOOL-> comment_on_issue'")
+	}
+	if !hasInferred {
+		t.Error("missing inferred relation 'create_issue -PREREQUISITE_FOR-> comment_on_issue'")
+	}
 }

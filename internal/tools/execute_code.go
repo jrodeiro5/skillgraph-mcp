@@ -5,6 +5,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math/rand"
+	"os"
+	"path/filepath"
+	"sync"
+	"time"
 
 	"github.com/kurtisvg/skillful-mcp/internal/mcpserver"
 
@@ -24,6 +29,36 @@ All downstream tools are available as functions, called by name:
 Positional and keyword arguments are both supported.
 
 IMPORTANT: Only call tools that were returned by use_skill or described in resources. Do not guess tool names or schemas — first call use_skill to discover the available tools and their input schemas for a given skill, then write code that calls those tools.`
+
+type contextKey string
+
+const traceCollectorKey contextKey = "traceCollector"
+
+type ToolCallTrace struct {
+	ToolName string         `json:"tool_name"`
+	Args     map[string]any `json:"args"`
+	Result   string         `json:"result"`
+	IsError  bool           `json:"is_error"`
+}
+
+type Trajectory struct {
+	Timestamp time.Time       `json:"timestamp"`
+	Code      string          `json:"code"`
+	ToolCalls []ToolCallTrace `json:"tool_calls"`
+	Output    string          `json:"output"`
+	Error     string          `json:"error,omitempty"`
+}
+
+type TraceCollector struct {
+	mu        sync.Mutex
+	ToolCalls []ToolCallTrace
+}
+
+func (c *TraceCollector) Add(call ToolCallTrace) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.ToolCalls = append(c.ToolCalls, call)
+}
 
 func RegisterExecuteCode(s *mcp.Server, mgr *mcpserver.Manager) {
 	mcp.AddTool(
@@ -61,12 +96,41 @@ func newExecuteCode(mgr *mcpserver.Manager) func(context.Context, *mcp.CallToolR
 			fns[t.ResolvedName] = buildTool(t, srv)
 		}
 
-		value, err := runner.Run(ctx, monty.RunOptions{
+		collector := &TraceCollector{}
+		ctxWithTrace := context.WithValue(ctx, traceCollectorKey, collector)
+
+		value, runErr := runner.Run(ctxWithTrace, monty.RunOptions{
 			Functions: fns,
 		})
-		if err != nil {
+
+		traj := Trajectory{
+			Timestamp: time.Now(),
+			Code:      input.Code,
+			ToolCalls: collector.ToolCalls,
+		}
+		if runErr != nil {
+			traj.Error = runErr.Error()
+		} else {
+			traj.Output = value.String()
+		}
+
+		// Save trace in background (non-blocking)
+		go func() {
+			tracesDir := filepath.Join(".", ".mcp_lattice", "traces")
+			if err := os.MkdirAll(tracesDir, 0755); err != nil {
+				return
+			}
+			data, err := json.MarshalIndent(traj, "", "  ")
+			if err != nil {
+				return
+			}
+			filename := fmt.Sprintf("%d_%d.json", time.Now().UnixNano(), rand.Intn(100000))
+			_ = os.WriteFile(filepath.Join(tracesDir, filename), data, 0644)
+		}()
+
+		if runErr != nil {
 			result := &mcp.CallToolResult{}
-			result.SetError(fmt.Errorf("runtime error: %w", err))
+			result.SetError(fmt.Errorf("runtime error: %w", runErr))
 			return result, nil, nil
 		}
 
@@ -112,20 +176,38 @@ func buildTool(t mcpserver.Tool, srv *mcpserver.Server) monty.ExternalFunction {
 			args[key] = montyValueToAny(pair.Value)
 		}
 
+		var trace ToolCallTrace
+		trace.ToolName = t.ResolvedName
+		trace.Args = args
+
 		toolResult, err := srv.CallTool(fnCtx, &mcp.CallToolParams{
 			Name:      t.OriginalName,
 			Arguments: args,
 		})
 		if err != nil {
-			return monty.Return(monty.String(fmt.Sprintf("error: %v", err))), nil
+			trace.IsError = true
+			trace.Result = fmt.Sprintf("error: %v", err)
+			if collector, ok := fnCtx.Value(traceCollectorKey).(*TraceCollector); ok {
+				collector.Add(trace)
+			}
+			return monty.Return(monty.String(trace.Result)), nil
 		}
 
 		if toolResult.IsError {
-			text := extractText(toolResult)
-			return monty.Return(monty.String(fmt.Sprintf("error: %s", text))), nil
+			trace.IsError = true
+			trace.Result = fmt.Sprintf("error: %s", extractText(toolResult))
+			if collector, ok := fnCtx.Value(traceCollectorKey).(*TraceCollector); ok {
+				collector.Add(trace)
+			}
+			return monty.Return(monty.String(trace.Result)), nil
 		}
 
-		return monty.Return(extractResult(toolResult)), nil
+		resVal := extractResult(toolResult)
+		trace.Result = resVal.String()
+		if collector, ok := fnCtx.Value(traceCollectorKey).(*TraceCollector); ok {
+			collector.Add(trace)
+		}
+		return monty.Return(resVal), nil
 	}
 }
 

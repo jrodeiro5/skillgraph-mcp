@@ -4,20 +4,28 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"strings"
+	"sync"
 
 	"github.com/kurtisvg/skillful-mcp/internal/config"
+	"github.com/kurtisvg/skillful-mcp/internal/graph"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
 type Manager struct {
+	mu      sync.RWMutex
 	servers map[string]*Server
 	tools   []Tool
+	graph   *graph.Graph
 }
 
 // NewManager creates a Manager by connecting to all servers in the config.
-func NewManager(ctx context.Context, cfgs map[string]config.Server) (*Manager, error) {
-	m := &Manager{servers: make(map[string]*Server)}
+func NewManager(ctx context.Context, cfgs map[string]config.Server, graphCfg *config.SkillGraphConfig) (*Manager, error) {
+	m := &Manager{
+		servers: make(map[string]*Server),
+		graph:   graph.New(),
+	}
 
 	for name, srv := range cfgs {
 		s, err := NewServer(ctx, srv)
@@ -28,6 +36,17 @@ func NewManager(ctx context.Context, cfgs map[string]config.Server) (*Manager, e
 		}
 		m.servers[name] = s
 		slog.Info("connected to server", "server", name)
+
+		// Add Skill Node
+		desc := ""
+		if graphCfg != nil && graphCfg.Descriptions[name] != "" {
+			desc = graphCfg.Descriptions[name]
+		} else if opts := srv.Options(); opts.Description != "" {
+			desc = opts.Description
+		} else if s.Instructions() != "" {
+			desc = s.Instructions()
+		}
+		m.graph.AddNode(name, graph.NodeSkill, name, desc)
 	}
 
 	tools, err := resolveTools(m.servers)
@@ -36,18 +55,155 @@ func NewManager(ctx context.Context, cfgs map[string]config.Server) (*Manager, e
 		return nil, err
 	}
 	m.tools = tools
+
+	// Add Tool Nodes and their HAS_TOOL relationships
+	for _, t := range m.tools {
+		desc := t.Description
+		if graphCfg != nil && graphCfg.Descriptions[t.ResolvedName] != "" {
+			desc = graphCfg.Descriptions[t.ResolvedName]
+		}
+		m.graph.AddNode(t.ResolvedName, graph.NodeTool, t.ResolvedName, desc)
+		m.graph.AddEdge(t.ServerName, t.ResolvedName, graph.RelHasTool, "")
+	}
+
+	// Dynamic inference
+	m.inferRelations(m.graph)
+
+	// Apply Static Relations from configuration
+	if graphCfg != nil {
+		for _, rel := range graphCfg.Relations {
+			if _, exists := m.graph.Nodes[rel.Source]; !exists {
+				nodeType := graph.NodeTool
+				if _, ok := m.servers[rel.Source]; ok {
+					nodeType = graph.NodeSkill
+				}
+				m.graph.AddNode(rel.Source, nodeType, rel.Source, "")
+			}
+			if _, exists := m.graph.Nodes[rel.Target]; !exists {
+				nodeType := graph.NodeTool
+				if _, ok := m.servers[rel.Target]; ok {
+					nodeType = graph.NodeSkill
+				}
+				m.graph.AddNode(rel.Target, nodeType, rel.Target, "")
+			}
+			m.graph.AddEdge(rel.Source, rel.Target, graph.RelationType(rel.Type), rel.Description)
+		}
+	}
+
 	return m, nil
 }
 
 // NewManagerFromServers creates a Manager from pre-built Servers (useful for testing).
 func NewManagerFromServers(servers map[string]*Server) (*Manager, error) {
-	m := &Manager{servers: servers}
+	m := &Manager{
+		servers: servers,
+		graph:   graph.New(),
+	}
 	tools, err := resolveTools(m.servers)
 	if err != nil {
 		return nil, err
 	}
 	m.tools = tools
+
+	// Add Skill and Tool Nodes for testing
+	for name, srv := range servers {
+		m.graph.AddNode(name, graph.NodeSkill, name, srv.Instructions())
+	}
+	for _, t := range m.tools {
+		m.graph.AddNode(t.ResolvedName, graph.NodeTool, t.ResolvedName, t.Description)
+		m.graph.AddEdge(t.ServerName, t.ResolvedName, graph.RelHasTool, "")
+	}
+	m.inferRelations(m.graph)
+
 	return m, nil
+}
+
+func (m *Manager) GetGraph() *graph.Graph {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return m.graph
+}
+
+// RebuildGraph rebuilds the capability graph from scratch using the updated config
+// and switches it atomically. This is thread-safe.
+func (m *Manager) RebuildGraph(graphCfg *config.SkillGraphConfig) {
+	g := graph.New()
+
+	// 1. Add Skill Nodes for each server
+	for name, s := range m.servers {
+		desc := ""
+		if graphCfg != nil && graphCfg.Descriptions[name] != "" {
+			desc = graphCfg.Descriptions[name]
+		} else if s.Instructions() != "" {
+			desc = s.Instructions()
+		}
+		g.AddNode(name, graph.NodeSkill, name, desc)
+	}
+
+	// 2. Add Tool Nodes and their HAS_TOOL relationships
+	for _, t := range m.tools {
+		desc := t.Description
+		if graphCfg != nil && graphCfg.Descriptions[t.ResolvedName] != "" {
+			desc = graphCfg.Descriptions[t.ResolvedName]
+		}
+		g.AddNode(t.ResolvedName, graph.NodeTool, t.ResolvedName, desc)
+		g.AddEdge(t.ServerName, t.ResolvedName, graph.RelHasTool, "")
+	}
+
+	// 3. Dynamic inference on the new graph
+	m.inferRelations(g)
+
+	// 4. Apply Static Relations from configuration
+	if graphCfg != nil {
+		for _, rel := range graphCfg.Relations {
+			if _, exists := g.Nodes[rel.Source]; !exists {
+				nodeType := graph.NodeTool
+				if _, ok := m.servers[rel.Source]; ok {
+					nodeType = graph.NodeSkill
+				}
+				g.AddNode(rel.Source, nodeType, rel.Source, "")
+			}
+			if _, exists := g.Nodes[rel.Target]; !exists {
+				nodeType := graph.NodeTool
+				if _, ok := m.servers[rel.Target]; ok {
+					nodeType = graph.NodeSkill
+				}
+				g.AddNode(rel.Target, nodeType, rel.Target, "")
+			}
+			g.AddEdge(rel.Source, rel.Target, graph.RelationType(rel.Type), rel.Description)
+		}
+	}
+
+	// Atomically switch graph
+	m.mu.Lock()
+	m.graph = g
+	m.mu.Unlock()
+}
+
+func (m *Manager) inferRelations(g *graph.Graph) {
+	for _, tA := range m.tools {
+		for _, param := range tA.Params {
+			if strings.HasSuffix(param.Name, "_id") || strings.HasSuffix(param.Name, "_number") {
+				prefix := strings.TrimSuffix(strings.TrimSuffix(param.Name, "_id"), "_number")
+				for _, tB := range m.tools {
+					if tA.ResolvedName == tB.ResolvedName {
+						continue
+					}
+					nameLower := strings.ToLower(tB.ResolvedName)
+					prefixLower := strings.ToLower(prefix)
+					isProducer := strings.Contains(nameLower, "create_"+prefixLower) ||
+						strings.Contains(nameLower, "new_"+prefixLower) ||
+						strings.Contains(nameLower, "get_"+prefixLower) ||
+						strings.Contains(nameLower, "search_"+prefixLower) ||
+						nameLower == prefixLower
+
+					if isProducer {
+						g.AddEdge(tB.ResolvedName, tA.ResolvedName, graph.RelPrerequisiteFor, fmt.Sprintf("provides %s", param.Name))
+					}
+				}
+			}
+		}
+	}
 }
 
 // resolveTools resolves tool names across all servers, prefixing with

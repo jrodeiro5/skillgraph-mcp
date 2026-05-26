@@ -2,8 +2,12 @@ package tools
 
 import (
 	"context"
+	"encoding/json"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/kurtisvg/skillful-mcp/internal/mcpserver"
 
@@ -323,5 +327,107 @@ func TestAnyToMonty(t *testing.T) {
 				t.Errorf("Kind() = %s, want %s", got.Kind(), tt.wantKind)
 			}
 		})
+	}
+}
+
+func TestExecuteCodeTrajectoryLogging(t *testing.T) {
+	t.Parallel()
+
+	ctx := t.Context()
+	ds := mcp.NewServer(&mcp.Implementation{Name: "logging-server"}, nil)
+	type GreetInput struct {
+		Name string `json:"name"`
+	}
+	mcp.AddTool(
+		ds,
+		&mcp.Tool{Name: "greet", Description: "Greet someone"},
+		func(ctx context.Context, req *mcp.CallToolRequest, input GreetInput) (*mcp.CallToolResult, any, error) {
+			return &mcp.CallToolResult{
+				Content: []mcp.Content{&mcp.TextContent{Text: "hello " + input.Name}},
+			}, nil, nil
+		},
+	)
+
+	dsServerT, dsClientT := mcp.NewInMemoryTransports()
+	go func() { _ = ds.Run(ctx, dsServerT) }()
+	dsClient := mcp.NewClient(&mcp.Implementation{Name: "test"}, nil)
+	dsSession, err := dsClient.Connect(ctx, dsClientT, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	srv, err := mcpserver.NewServerFromSession(ctx, dsSession)
+	if err != nil {
+		t.Fatal(err)
+	}
+	mgr, err := mcpserver.NewManagerFromServers(map[string]*mcpserver.Server{"logging-server": srv})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Clean/prepare traces directory
+	tracesDir := filepath.Join(".", ".mcp_lattice", "traces")
+	_ = os.RemoveAll(tracesDir)
+	defer os.RemoveAll(tracesDir)
+
+	fn := newExecuteCode(mgr)
+	req := &mcp.CallToolRequest{}
+	input := executeCodeInput{
+		Code: `greet("world")`,
+	}
+
+	res, _, err := fn(ctx, req, input)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.IsError {
+		t.Fatalf("executeCode returned error: %s", extractText(res))
+	}
+
+	// Wait up to 2 seconds for background logging goroutine to write the trace file
+	var files []string
+	for i := 0; i < 20; i++ {
+		files, _ = filepath.Glob(filepath.Join(tracesDir, "*.json"))
+		if len(files) > 0 {
+			break
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+
+	if len(files) == 0 {
+		t.Fatal("expected trajectory trace file to be created, but found none")
+	}
+
+	// Read and verify trace file content
+	data, err := os.ReadFile(files[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var traj Trajectory
+	if err := json.Unmarshal(data, &traj); err != nil {
+		t.Fatalf("failed to unmarshal trajectory: %v", err)
+	}
+
+	if traj.Code != `greet("world")` {
+		t.Errorf("got code = %q, want 'greet(\"world\")'", traj.Code)
+	}
+	if len(traj.ToolCalls) != 1 {
+		t.Fatalf("expected 1 tool call, got %d", len(traj.ToolCalls))
+	}
+	if traj.ToolCalls[0].ToolName != "greet" {
+		t.Errorf("got tool name = %q, want 'greet'", traj.ToolCalls[0].ToolName)
+	}
+	if traj.ToolCalls[0].Args["name"] != "world" {
+		t.Errorf("got tool args name = %v, want 'world'", traj.ToolCalls[0].Args["name"])
+	}
+	if traj.ToolCalls[0].Result != "hello world" {
+		t.Errorf("got tool call result = %q, want 'hello world'", traj.ToolCalls[0].Result)
+	}
+	if traj.Output != "hello world" {
+		t.Errorf("got traj output = %q, want 'hello world'", traj.Output)
+	}
+	if traj.Error != "" {
+		t.Errorf("expected no error, got %q", traj.Error)
 	}
 }

@@ -41,3 +41,12 @@ Este documento detalla las tareas pendientes para implementar un modelo de grafo
 - [x] Implementar el descargador de READMEs en `internal/docs/fetcher.go`
 - [x] Vincular la descarga de documentación en el inicio de los skills
 - [x] Verificar el correcto funcionamiento de la descarga y tests
+
+## Fase 7: Optimización Dinámica de Habilidades (SkillOpt) [Completado]
+- [x] Implementar logging de trayectorias (rollouts) en `execute_code.go` usando `TraceCollector` context-based.
+- [x] Guardar trazas como JSON en `.mcp_lattice/traces/`.
+- [x] Crear un demonio en segundo plano (`startOptimizationLoop` en `refine/engine.go`) que analice trazas acumuladas periódicamente.
+- [x] Implementar bucle de optimización de texto (SkillOpt) con prompts para DeepSeek/Gemini que sugieran modificaciones y relaciones en `mcp.json`.
+- [x] Validar que las propuestas no contengan nodos alucinados antes de persistir los cambios en la configuración.
+- [x] Escribir pruebas unitarias correspondientes en `execute_code_test.go` y `engine_test.go` para verificar el correcto funcionamiento.
+

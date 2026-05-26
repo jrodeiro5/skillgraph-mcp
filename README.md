@@ -43,20 +43,32 @@ Agent  <--MCP-->  skillful-mcp  <--MCP-->  Database Server
 ```
 
 skillful-mcp reads a standard `mcp.json` config, connects to each downstream
-server, and exposes four tools:
+server, and exposes seven tools:
 
-| Tool             | Description                                                                      |
-|------------------|----------------------------------------------------------------------------------|
-| `list_skills`    | Returns the names of all configured downstream servers                           |
-| `use_skill`      | Lists the tools and resources available in a specific skill                      |
-| `read_resource`  | Reads a resource from a specific skill                                           |
-| `execute_code`   | Runs Python code in a secure [Monty](https://github.com/pydantic/monty) sandbox |
+| Tool              | Description                                                                      |
+|-------------------|----------------------------------------------------------------------------------|
+| `list_skills`     | Returns the names of all configured downstream servers                           |
+| `use_skill`       | Lists the tools and resources available in a specific skill                      |
+| `read_resource`   | Reads a resource from a specific skill                                           |
+| `execute_code`    | Runs Python code in a secure [Monty](https://github.com/pydantic/monty) sandbox |
+| `get_skill_graph` | Returns the capability relationship graph                                        |
+| `plan_workflow`   | Receives a high-level goal and returns a recommended path of execution           |
+| `read_lattice`    | Reads files from the generated `.mcp_lattice` semantic documentation index       |
 
 The typical agent workflow:
 
-1. Call `list_skills` to see what's available
-2. Call `use_skill` to inspect a skill's tools and their input schemas
-3. Use `execute_code` to orchestrate tool calls in a single round-trip
+1. Call `list_skills` to see what's available.
+2. Call `get_skill_graph` or `plan_workflow` to inspect relations and plan the steps.
+3. Call `use_skill` to inspect a skill's tools and their input schemas.
+4. Use `execute_code` to orchestrate tool calls in a single round-trip.
+
+### 🔄 Self-Evolving Optimization (SkillOpt)
+
+`skillful-mcp` implements a self-evolving skill optimization mechanism inspired by Microsoft's **SkillOpt** framework (arXiv:2605.23904):
+* **Trajectory Logging:** When the agent runs Python code via `execute_code`, the gateway records execution trajectories (rollouts) including arguments, results, and runtime errors under `.mcp_lattice/traces/`.
+* **Background Refinement:** A background daemon periodically reads these traces, reflects on execution errors (such as parameter mismatches or missing prerequisites), and prompts an LLM to propose text-space optimization edits (add/replace/delete tool descriptions or graph relations) in `mcp.json`.
+* **Zero Latency:** Updates are verified and applied atomically, ensuring that future routing and discovery prompts are optimized dynamically without model retraining.
+
 
 ### Example Code Mode Usage
 

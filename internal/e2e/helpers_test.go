@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/kurtisvg/skillful-mcp/internal/app"
-	"github.com/kurtisvg/skillful-mcp/internal/mcpserver"
+	"github.com/jrodeiro5/skillgraph-mcp/internal/app"
+	"github.com/jrodeiro5/skillgraph-mcp/internal/mcpserver"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
@@ -56,7 +56,7 @@ func startFakeServer(t *testing.T, ctx context.Context, instructions string, too
 func connectTestClient(t *testing.T, ctx context.Context, mgr *mcpserver.Manager) *mcp.ClientSession {
 	t.Helper()
 
-	upstream := app.NewServer(mgr)
+	upstream := app.NewServer(mgr, t.TempDir())
 	serverT, clientT := mcp.NewInMemoryTransports()
 	go func() { _ = upstream.Run(ctx, serverT) }()
 

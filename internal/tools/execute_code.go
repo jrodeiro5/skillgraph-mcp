@@ -11,7 +11,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/kurtisvg/skillful-mcp/internal/mcpserver"
+	"github.com/jrodeiro5/skillgraph-mcp/internal/mcpserver"
+	"github.com/jrodeiro5/skillgraph-mcp/internal/trace"
 
 	monty "github.com/ewhauser/gomonty"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -34,44 +35,29 @@ type contextKey string
 
 const traceCollectorKey contextKey = "traceCollector"
 
-type ToolCallTrace struct {
-	ToolName string         `json:"tool_name"`
-	Args     map[string]any `json:"args"`
-	Result   string         `json:"result"`
-	IsError  bool           `json:"is_error"`
-}
-
-type Trajectory struct {
-	Timestamp time.Time       `json:"timestamp"`
-	Code      string          `json:"code"`
-	ToolCalls []ToolCallTrace `json:"tool_calls"`
-	Output    string          `json:"output"`
-	Error     string          `json:"error,omitempty"`
-}
-
 type TraceCollector struct {
 	mu        sync.Mutex
-	ToolCalls []ToolCallTrace
+	ToolCalls []trace.ToolCallTrace
 }
 
-func (c *TraceCollector) Add(call ToolCallTrace) {
+func (c *TraceCollector) Add(call trace.ToolCallTrace) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.ToolCalls = append(c.ToolCalls, call)
 }
 
-func RegisterExecuteCode(s *mcp.Server, mgr *mcpserver.Manager) {
+func RegisterExecuteCode(s *mcp.Server, mgr *mcpserver.Manager, latticeDir string) {
 	mcp.AddTool(
 		s,
 		&mcp.Tool{
 			Name:        "execute_code",
 			Description: executeCodeDescription,
 		},
-		newExecuteCode(mgr),
+		newExecuteCode(mgr, latticeDir),
 	)
 }
 
-func newExecuteCode(mgr *mcpserver.Manager) func(context.Context, *mcp.CallToolRequest, executeCodeInput) (*mcp.CallToolResult, any, error) {
+func newExecuteCode(mgr *mcpserver.Manager, latticeDir string) func(context.Context, *mcp.CallToolRequest, executeCodeInput) (*mcp.CallToolResult, any, error) {
 	return func(ctx context.Context, req *mcp.CallToolRequest, input executeCodeInput) (*mcp.CallToolResult, any, error) {
 		if input.Code == "" {
 			result := &mcp.CallToolResult{}
@@ -103,7 +89,7 @@ func newExecuteCode(mgr *mcpserver.Manager) func(context.Context, *mcp.CallToolR
 			Functions: fns,
 		})
 
-		traj := Trajectory{
+		traj := trace.Trajectory{
 			Timestamp: time.Now(),
 			Code:      input.Code,
 			ToolCalls: collector.ToolCalls,
@@ -116,7 +102,7 @@ func newExecuteCode(mgr *mcpserver.Manager) func(context.Context, *mcp.CallToolR
 
 		// Save trace in background (non-blocking)
 		go func() {
-			tracesDir := filepath.Join(".", ".mcp_lattice", "traces")
+			tracesDir := filepath.Join(latticeDir, "traces")
 			if err := os.MkdirAll(tracesDir, 0755); err != nil {
 				return
 			}
@@ -176,36 +162,36 @@ func buildTool(t mcpserver.Tool, srv *mcpserver.Server) monty.ExternalFunction {
 			args[key] = montyValueToAny(pair.Value)
 		}
 
-		var trace ToolCallTrace
-		trace.ToolName = t.ResolvedName
-		trace.Args = args
+		var tc trace.ToolCallTrace
+		tc.ToolName = t.ResolvedName
+		tc.Args = args
 
 		toolResult, err := srv.CallTool(fnCtx, &mcp.CallToolParams{
 			Name:      t.OriginalName,
 			Arguments: args,
 		})
 		if err != nil {
-			trace.IsError = true
-			trace.Result = fmt.Sprintf("error: %v", err)
+			tc.IsError = true
+			tc.Result = fmt.Sprintf("error: %v", err)
 			if collector, ok := fnCtx.Value(traceCollectorKey).(*TraceCollector); ok {
-				collector.Add(trace)
+				collector.Add(tc)
 			}
-			return monty.Return(monty.String(trace.Result)), nil
+			return monty.Return(monty.String(tc.Result)), nil
 		}
 
 		if toolResult.IsError {
-			trace.IsError = true
-			trace.Result = fmt.Sprintf("error: %s", extractText(toolResult))
+			tc.IsError = true
+			tc.Result = fmt.Sprintf("error: %s", extractText(toolResult))
 			if collector, ok := fnCtx.Value(traceCollectorKey).(*TraceCollector); ok {
-				collector.Add(trace)
+				collector.Add(tc)
 			}
-			return monty.Return(monty.String(trace.Result)), nil
+			return monty.Return(monty.String(tc.Result)), nil
 		}
 
 		resVal := extractResult(toolResult)
-		trace.Result = resVal.String()
+		tc.Result = resVal.String()
 		if collector, ok := fnCtx.Value(traceCollectorKey).(*TraceCollector); ok {
-			collector.Add(trace)
+			collector.Add(tc)
 		}
 		return monty.Return(resVal), nil
 	}

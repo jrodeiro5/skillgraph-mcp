@@ -9,27 +9,28 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
 
-	"github.com/kurtisvg/skillful-mcp/internal/config"
-	"github.com/kurtisvg/skillful-mcp/internal/docs"
-	"github.com/kurtisvg/skillful-mcp/internal/mcpserver"
+	"github.com/jrodeiro5/skillgraph-mcp/internal/config"
+	"github.com/jrodeiro5/skillgraph-mcp/internal/docs"
+	"github.com/jrodeiro5/skillgraph-mcp/internal/mcpserver"
+	"github.com/jrodeiro5/skillgraph-mcp/internal/trace"
 )
 
 var (
-	deepseekEndpoint = "https://api.deepseek.com/v1/chat/completions"
-	geminiEndpoint   = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent"
+	deepseekEndpoint    = "https://api.deepseek.com/v1/chat/completions"
+	geminiEndpoint      = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent"
+	openaiCompatEndpoint = "https://api.openai.com/v1/chat/completions"
 )
 
 // StartRefinementLoop starts the background refinement process for servers that
 // lack a configured skillGraph, and sets up the SkillOpt trajectory optimization daemon.
 func StartRefinementLoop(ctx context.Context, configPath string, mgr *mcpserver.Manager, latticeDir string, servers map[string]config.Server) {
 	provider, key := getAPIKey()
-	if provider == "" || key == "" {
-		slog.Warn("RefinementEngine: No DEEPSEEK_API_KEY, GEMINI_API_KEY, or pass key found. Skipping background graph generation.")
+	if provider == "" {
+		slog.Warn("RefinementEngine: No LLM provider configured (set LLM_BASE_URL, OPENAI_API_KEY, DEEPSEEK_API_KEY, or GEMINI_API_KEY). Skipping background graph generation.")
 		return
 	}
 
@@ -70,24 +71,19 @@ func StartRefinementLoop(ctx context.Context, configPath string, mgr *mcpserver.
 }
 
 func getAPIKey() (string, string) {
+	// Generic OpenAI-compatible provider (LiteLLM proxy, Ollama, etc.) takes priority.
+	if os.Getenv("LLM_BASE_URL") != "" {
+		return "openai", os.Getenv("LLM_API_KEY")
+	}
+	if key := os.Getenv("OPENAI_API_KEY"); key != "" {
+		return "openai", key
+	}
 	if key := os.Getenv("DEEPSEEK_API_KEY"); key != "" {
 		return "deepseek", key
 	}
 	if key := os.Getenv("GEMINI_API_KEY"); key != "" {
 		return "gemini", key
 	}
-
-	// Fallback to Pass Manager
-	cmd := exec.Command("pass", "show", "deepseek/api_key")
-	var out bytes.Buffer
-	cmd.Stdout = &out
-	if err := cmd.Run(); err == nil {
-		k := strings.TrimSpace(out.String())
-		if k != "" {
-			return "deepseek", k
-		}
-	}
-
 	return "", ""
 }
 
@@ -174,9 +170,12 @@ Guidelines:
 
 	// 3. Request LLM
 	var refinedJSON string
-	if provider == "deepseek" {
+	switch provider {
+	case "openai":
+		refinedJSON, err = callOpenAICompat(ctx, key, systemPrompt, userPrompt)
+	case "deepseek":
 		refinedJSON, err = callDeepSeek(ctx, key, systemPrompt, userPrompt)
-	} else {
+	default:
 		refinedJSON, err = callGemini(ctx, key, systemPrompt, userPrompt)
 	}
 	if err != nil {
@@ -259,6 +258,33 @@ Guidelines:
 	return nil
 }
 
+// saveSkillGraphSnapshot writes cfg to <historyDir>/skillgraph_<ns>.json and
+// trims the directory to the 5 most recent snapshots.
+func saveSkillGraphSnapshot(historyDir string, cfg config.SkillGraphConfig) error {
+	if err := os.MkdirAll(historyDir, 0755); err != nil {
+		return err
+	}
+	data, err := json.MarshalIndent(cfg, "", "  ")
+	if err != nil {
+		return err
+	}
+	name := fmt.Sprintf("skillgraph_%d.json", time.Now().UnixNano())
+	if err := os.WriteFile(filepath.Join(historyDir, name), data, 0644); err != nil {
+		return err
+	}
+
+	// Trim to 5 most recent.
+	files, err := filepath.Glob(filepath.Join(historyDir, "skillgraph_*.json"))
+	if err != nil || len(files) <= 5 {
+		return nil
+	}
+	// Files are named by nanosecond timestamp so lexicographic == chronological.
+	for _, f := range files[:len(files)-5] {
+		_ = os.Remove(f)
+	}
+	return nil
+}
+
 func cleanMarkdownJSON(s string) string {
 	s = strings.TrimSpace(s)
 	if strings.HasPrefix(s, "```json") {
@@ -320,6 +346,64 @@ func callDeepSeek(ctx context.Context, key, system, user string) (string, error)
 	return data.Choices[0].Message.Content, nil
 }
 
+func callOpenAICompat(ctx context.Context, key, system, user string) (string, error) {
+	endpoint := openaiCompatEndpoint
+	if base := os.Getenv("LLM_BASE_URL"); base != "" {
+		endpoint = strings.TrimRight(base, "/") + "/chat/completions"
+	}
+	model := os.Getenv("LLM_MODEL")
+	if model == "" {
+		model = "gpt-4o"
+	}
+
+	reqBody, err := json.Marshal(map[string]any{
+		"model": model,
+		"messages": []map[string]string{
+			{"role": "system", "content": system},
+			{"role": "user", "content": user},
+		},
+		"response_format": map[string]string{"type": "json_object"},
+	})
+	if err != nil {
+		return "", err
+	}
+
+	req, err := http.NewRequestWithContext(ctx, "POST", endpoint, bytes.NewReader(reqBody))
+	if err != nil {
+		return "", err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	if key != "" {
+		req.Header.Set("Authorization", "Bearer "+key)
+	}
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return "", fmt.Errorf("OpenAI-compat API returned HTTP %d: %s", resp.StatusCode, string(body))
+	}
+
+	var data struct {
+		Choices []struct {
+			Message struct {
+				Content string `json:"content"`
+			} `json:"message"`
+		} `json:"choices"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
+		return "", err
+	}
+	if len(data.Choices) == 0 {
+		return "", fmt.Errorf("no choices returned by OpenAI-compat API")
+	}
+	return data.Choices[0].Message.Content, nil
+}
+
 func callGemini(ctx context.Context, key, system, user string) (string, error) {
 	promptText := fmt.Sprintf("%s\n\nInput Data:\n%s", system, user)
 	reqBody, err := json.Marshal(map[string]any{
@@ -376,21 +460,6 @@ func callGemini(ctx context.Context, key, system, user string) (string, error) {
 	return data.Candidates[0].Content.Parts[0].Text, nil
 }
 
-type ToolCallTrace struct {
-	ToolName string         `json:"tool_name"`
-	Args     map[string]any `json:"args"`
-	Result   string         `json:"result"`
-	IsError  bool           `json:"is_error"`
-}
-
-type Trajectory struct {
-	Timestamp time.Time       `json:"timestamp"`
-	Code      string          `json:"code"`
-	ToolCalls []ToolCallTrace `json:"tool_calls"`
-	Output    string          `json:"output"`
-	Error     string          `json:"error,omitempty"`
-}
-
 func startOptimizationLoop(ctx context.Context, provider, key, configPath string, mgr *mcpserver.Manager, latticeDir string, servers map[string]config.Server) {
 	ticker := time.NewTicker(30 * time.Second)
 	defer ticker.Stop()
@@ -426,19 +495,42 @@ func startOptimizationLoop(ctx context.Context, provider, key, configPath string
 }
 
 func optimizeTraces(ctx context.Context, provider, key, configPath string, mgr *mcpserver.Manager, latticeDir string, servers map[string]config.Server, files []string) error {
-	var trajectories []Trajectory
+	var trajectories []trace.Trajectory
 	for _, f := range files {
 		data, err := os.ReadFile(f)
 		if err != nil {
 			continue
 		}
-		var t Trajectory
+		var t trace.Trajectory
 		if err := json.Unmarshal(data, &t); err == nil {
 			trajectories = append(trajectories, t)
 		}
 	}
 
 	if len(trajectories) == 0 {
+		return nil
+	}
+
+	// Skip LLM call when the batch has no errors — nothing to optimize.
+	hasErrors := false
+outer:
+	for _, traj := range trajectories {
+		if traj.Error != "" {
+			hasErrors = true
+			break
+		}
+		for _, tc := range traj.ToolCalls {
+			if tc.IsError {
+				hasErrors = true
+				break outer
+			}
+		}
+	}
+	if !hasErrors {
+		slog.Debug("RefinementEngine: SkillOpt skipping — no errors in batch", "traces", len(trajectories))
+		for _, f := range files {
+			_ = os.Remove(f)
+		}
 		return nil
 	}
 
@@ -525,9 +617,12 @@ Guidelines:
 
 	var refinedJSON string
 	var err error
-	if provider == "deepseek" {
+	switch provider {
+	case "openai":
+		refinedJSON, err = callOpenAICompat(ctx, key, systemPrompt, userPrompt)
+	case "deepseek":
 		refinedJSON, err = callDeepSeek(ctx, key, systemPrompt, userPrompt)
-	} else {
+	default:
 		refinedJSON, err = callGemini(ctx, key, systemPrompt, userPrompt)
 	}
 	if err != nil {
@@ -596,6 +691,10 @@ Guidelines:
 	}
 
 	if modified {
+		// Snapshot current state before overwriting so edits can be rolled back.
+		if snapErr := saveSkillGraphSnapshot(filepath.Join(latticeDir, "history"), *currentGraphCfg); snapErr != nil {
+			slog.Warn("RefinementEngine: failed to save pre-edit snapshot", "error", snapErr)
+		}
 		if err := config.SaveSkillGraph(configPath, currentGraphCfg); err != nil {
 			return fmt.Errorf("saving refined config: %w", err)
 		}

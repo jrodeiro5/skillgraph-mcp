@@ -7,8 +7,8 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/kurtisvg/skillful-mcp/internal/config"
-	"github.com/kurtisvg/skillful-mcp/internal/graph"
+	"github.com/jrodeiro5/skillgraph-mcp/internal/config"
+	"github.com/jrodeiro5/skillgraph-mcp/internal/graph"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )

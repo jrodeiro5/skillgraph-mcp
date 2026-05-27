@@ -8,8 +8,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/kurtisvg/skillful-mcp/internal/config"
-	"github.com/kurtisvg/skillful-mcp/internal/graph"
+	"github.com/jrodeiro5/skillgraph-mcp/internal/config"
+	"github.com/jrodeiro5/skillgraph-mcp/internal/graph"
 )
 
 // GenerateLattice generates the `.mcp_lattice` folder containing skills, relations, and downloaded READMEs.

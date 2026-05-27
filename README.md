@@ -64,10 +64,33 @@ The typical agent workflow:
 
 ### 🔄 Self-Evolving Optimization (SkillOpt)
 
-`skillful-mcp` implements a self-evolving skill optimization mechanism inspired by Microsoft's **SkillOpt** framework (arXiv:2605.23904):
-* **Trajectory Logging:** When the agent runs Python code via `execute_code`, the gateway records execution trajectories (rollouts) including arguments, results, and runtime errors under `.mcp_lattice/traces/`.
-* **Background Refinement:** A background daemon periodically reads these traces, reflects on execution errors (such as parameter mismatches or missing prerequisites), and prompts an LLM to propose text-space optimization edits (add/replace/delete tool descriptions or graph relations) in `mcp.json`.
+`skillgraph-mcp` implements a self-evolving skill optimization mechanism inspired by Microsoft's **SkillOpt** framework (arXiv:2605.23904):
+* **Trajectory Logging:** When the agent runs Python code via `execute_code`, the gateway records execution trajectories (rollouts) including arguments, results, and runtime errors under `.mcp_lattice/traces/` (relative to the CWD where skillgraph-mcp is launched).
+* **Background Refinement:** A background daemon periodically reads these traces and — only when errors are present — prompts an LLM to propose text-space optimization edits (add/replace/delete tool descriptions or graph relations) in `mcp.json`.
 * **Zero Latency:** Updates are verified and applied atomically, ensuring that future routing and discovery prompts are optimized dynamically without model retraining.
+
+To enable the SkillOpt and bootstrap refinement loops, set one of these environment variables:
+
+| Variable | Provider | Notes |
+|---|---|---|
+| `LLM_BASE_URL` | Any OpenAI-compatible API | LiteLLM proxy, Ollama, etc. Set `LLM_API_KEY` and `LLM_MODEL` alongside |
+| `OPENAI_API_KEY` | OpenAI | Uses `gpt-4o` by default; override with `LLM_MODEL` |
+| `DEEPSEEK_API_KEY` | DeepSeek | Uses `deepseek-chat` |
+| `GEMINI_API_KEY` | Google Gemini | Uses `gemini-1.5-pro` |
+
+`LLM_BASE_URL` takes priority. When set, `LLM_API_KEY` is optional (Ollama and other local servers don't require auth).
+
+**Examples:**
+```sh
+# Ollama (local, no auth)
+LLM_BASE_URL=http://localhost:11434/v1 LLM_MODEL=llama3.1 skillgraph-mcp --config mcp.json
+
+# LiteLLM proxy (routes to any backend)
+LLM_BASE_URL=http://localhost:4000 LLM_API_KEY=sk-... LLM_MODEL=anthropic/claude-3-5-haiku skillgraph-mcp --config mcp.json
+
+# OpenAI directly
+OPENAI_API_KEY=sk-... skillgraph-mcp --config mcp.json
+```
 
 
 ### Example Code Mode Usage
@@ -120,7 +143,7 @@ docker run --rm \
 </details>
 
 <details>
-<summary><strong>Go install</strong> (requires Go 1.25+)</summary>
+<summary><strong>Go install</strong> (requires Go 1.26+)</summary>
 
 ```sh
 go install github.com/jrodeiro5/skillgraph-mcp@latest
@@ -363,3 +386,29 @@ Connects via Server-Sent Events.
 | `--host`        | `localhost`  | HTTP listen host                      |
 | `--port`        | `8080`       | HTTP listen port                      |
 | `--version`     |              | Print version and exit                |
+
+## ⚠️ Gotchas
+
+**STDIO child processes get a blank environment.** When `command` servers are launched, they inherit only the variables explicitly listed in the `env` block — not the parent shell's environment. If a child process needs `PATH`, `HOME`, or any other system variable, you must pass it explicitly:
+
+```json
+"env": {
+  "PATH": "${PATH}",
+  "HOME": "${HOME}",
+  "MY_API_KEY": "${MY_API_KEY}"
+}
+```
+
+**`.mcp_lattice/` is relative to CWD.** Traces, READMEs, and lattice files are written to `.mcp_lattice/` in the working directory where skillgraph-mcp is launched — not next to the config file. If you run it from different directories, traces accumulate in different places.
+
+**`mcp.json` is mutated at runtime.** The `skillGraph` section (descriptions and relations) is auto-populated and updated by the background refinement loops. Keep a copy if you want to preserve a known-good baseline, or use git to track changes.
+
+## 🔧 Troubleshooting
+
+**SkillOpt loop never runs** — Check that an LLM env var is set (`LLM_BASE_URL`, `OPENAI_API_KEY`, `DEEPSEEK_API_KEY`, or `GEMINI_API_KEY`). Without one, both background loops are skipped silently on startup.
+
+**Child server won't start** — Run skillgraph-mcp with `--transport http` and check logs. The most common cause is a missing env var (remember: child processes get a blank env, not the parent shell's env).
+
+**Tool name conflicts** — If two skills define a tool with the same name, skillgraph-mcp prefixes both with their skill name (e.g. `github_search`, `docs_search`). The prefixed names are what `use_skill` returns and what `execute_code` expects.
+
+**Graph not updating after config edit** — The graph is loaded once at startup. Restart skillgraph-mcp to pick up manual edits to `mcp.json`'s `skillGraph` section.

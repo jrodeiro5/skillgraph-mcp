@@ -10,8 +10,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/kurtisvg/skillful-mcp/internal/config"
-	"github.com/kurtisvg/skillful-mcp/internal/mcpserver"
+	"github.com/jrodeiro5/skillgraph-mcp/internal/config"
+	"github.com/jrodeiro5/skillgraph-mcp/internal/mcpserver"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
@@ -254,6 +254,251 @@ func TestRefineServerExecution(t *testing.T) {
 
 	if n.Description != "A clean calculator skill" {
 		t.Errorf("expected node description 'A clean calculator skill', got '%s'", n.Description)
+	}
+}
+
+func TestOptimizeTracesSkipsLLMWhenNoErrors(t *testing.T) {
+	ctx := context.Background()
+
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "mcp.json")
+	latticeDir := filepath.Join(tmpDir, ".mcp_lattice")
+
+	if err := os.WriteFile(configPath, []byte(`{"mcpServers":{"s":{"command":"x"}}}`), 0644); err != nil {
+		t.Fatal(err)
+	}
+	servers, _, err := config.Load(configPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	session := startFakeServer(t, ctx, []string{"tool_a"})
+	defer session.Close()
+	srv, err := mcpserver.NewServerFromSession(ctx, session)
+	if err != nil {
+		t.Fatal(err)
+	}
+	mgr, err := mcpserver.NewManagerFromServers(map[string]*mcpserver.Server{"s": srv})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Write a trace with no errors at all.
+	tracesDir := filepath.Join(latticeDir, "traces")
+	if err := os.MkdirAll(tracesDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	tracePath := filepath.Join(tracesDir, "success.json")
+	successTrace := `{
+		"timestamp": "2026-05-27T10:00:00Z",
+		"code": "tool_a(param1=\"hello\")",
+		"tool_calls": [{"tool_name":"tool_a","args":{"param1":"hello"},"result":"ok","is_error":false}],
+		"output": "ok"
+	}`
+	if err := os.WriteFile(tracePath, []byte(successTrace), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	// LLM mock that fails the test if called.
+	llmCalled := false
+	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		llmCalled = true
+		http.Error(w, "should not be called", http.StatusInternalServerError)
+	}))
+	defer mockServer.Close()
+
+	oldDS := deepseekEndpoint
+	deepseekEndpoint = mockServer.URL
+	defer func() { deepseekEndpoint = oldDS }()
+
+	if err := optimizeTraces(ctx, "deepseek", "key", configPath, mgr, latticeDir, servers, []string{tracePath}); err != nil {
+		t.Fatalf("optimizeTraces failed: %v", err)
+	}
+
+	if llmCalled {
+		t.Error("LLM was called for a batch with no errors")
+	}
+	if _, err := os.Stat(tracePath); !os.IsNotExist(err) {
+		t.Error("expected trace file to be cleaned up")
+	}
+}
+
+func TestCallOpenAICompat(t *testing.T) {
+	var gotModel string
+	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("Authorization") != "Bearer oai-test-key" {
+			t.Errorf("expected Bearer oai-test-key, got %s", r.Header.Get("Authorization"))
+		}
+		var body struct {
+			Model string `json:"model"`
+		}
+		_ = json.NewDecoder(r.Body).Decode(&body)
+		gotModel = body.Model
+		w.Header().Set("Content-Type", "application/json")
+		resp := map[string]any{
+			"choices": []map[string]any{
+				{"message": map[string]string{"content": `{"status": "openai-ok"}`}},
+			},
+		}
+		json.NewEncoder(w).Encode(resp)
+	}))
+	defer mockServer.Close()
+
+	old := openaiCompatEndpoint
+	openaiCompatEndpoint = mockServer.URL
+	defer func() { openaiCompatEndpoint = old }()
+
+	res, err := callOpenAICompat(context.Background(), "oai-test-key", "system", "user")
+	if err != nil {
+		t.Fatalf("callOpenAICompat failed: %v", err)
+	}
+	if res != `{"status": "openai-ok"}` {
+		t.Errorf("expected openai-ok content, got %s", res)
+	}
+	if gotModel == "" {
+		t.Error("expected model to be sent in request body")
+	}
+}
+
+func TestCallOpenAICompatNoKey(t *testing.T) {
+	// Local models (Ollama) may not require an API key — no Authorization header should be sent.
+	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("Authorization") != "" {
+			t.Errorf("expected no Authorization header for empty key, got %s", r.Header.Get("Authorization"))
+		}
+		w.Header().Set("Content-Type", "application/json")
+		resp := map[string]any{
+			"choices": []map[string]any{
+				{"message": map[string]string{"content": `{"ok":true}`}},
+			},
+		}
+		json.NewEncoder(w).Encode(resp)
+	}))
+	defer mockServer.Close()
+
+	old := openaiCompatEndpoint
+	openaiCompatEndpoint = mockServer.URL
+	defer func() { openaiCompatEndpoint = old }()
+
+	res, err := callOpenAICompat(context.Background(), "", "system", "user")
+	if err != nil {
+		t.Fatalf("callOpenAICompat (no key) failed: %v", err)
+	}
+	if res != `{"ok":true}` {
+		t.Errorf("unexpected response: %s", res)
+	}
+}
+
+func TestGetAPIKeyLLMBaseURL(t *testing.T) {
+	t.Setenv("LLM_BASE_URL", "http://localhost:11434/v1")
+	t.Setenv("LLM_API_KEY", "local-key")
+	// Clear competing vars so this test is isolated.
+	t.Setenv("DEEPSEEK_API_KEY", "")
+	t.Setenv("GEMINI_API_KEY", "")
+	t.Setenv("OPENAI_API_KEY", "")
+
+	provider, key := getAPIKey()
+	if provider != "openai" {
+		t.Errorf("expected provider openai, got %s", provider)
+	}
+	if key != "local-key" {
+		t.Errorf("expected key local-key, got %s", key)
+	}
+}
+
+func TestSnapshotCreatedBeforeEdit(t *testing.T) {
+	ctx := context.Background()
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "mcp.json")
+	latticeDir := filepath.Join(tmpDir, ".mcp_lattice")
+
+	initial := `{"mcpServers":{"s":{"command":"x"}},"skillGraph":{"descriptions":{"s":"original"}}}`
+	if err := os.WriteFile(configPath, []byte(initial), 0644); err != nil {
+		t.Fatal(err)
+	}
+	servers, _, err := config.Load(configPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	session := startFakeServer(t, ctx, []string{"tool_a"})
+	defer session.Close()
+	srv, err := mcpserver.NewServerFromSession(ctx, session)
+	if err != nil {
+		t.Fatal(err)
+	}
+	mgr, err := mcpserver.NewManagerFromServers(map[string]*mcpserver.Server{"s": srv})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	tracesDir := filepath.Join(latticeDir, "traces")
+	if err := os.MkdirAll(tracesDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	tracePath := filepath.Join(tracesDir, "err.json")
+	errTrace := `{"timestamp":"2026-05-27T10:00:00Z","code":"tool_a()","tool_calls":[{"tool_name":"tool_a","args":{},"result":"error: bad","is_error":true}],"error":"bad"}`
+	if err := os.WriteFile(tracePath, []byte(errTrace), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]any{
+			"choices": []map[string]any{
+				{"message": map[string]string{"content": `{"descriptions":{"tool_a":"improved"},"relations":[]}`}},
+			},
+		})
+	}))
+	defer mockServer.Close()
+	old := deepseekEndpoint
+	deepseekEndpoint = mockServer.URL
+	defer func() { deepseekEndpoint = old }()
+
+	if err := optimizeTraces(ctx, "deepseek", "key", configPath, mgr, latticeDir, servers, []string{tracePath}); err != nil {
+		t.Fatalf("optimizeTraces: %v", err)
+	}
+
+	// A snapshot must exist in <latticeDir>/history/ before the edit was applied.
+	snapshots, err := filepath.Glob(filepath.Join(latticeDir, "history", "skillgraph_*.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(snapshots) == 0 {
+		t.Fatal("expected at least one snapshot in history/, got none")
+	}
+
+	// Snapshot must contain the original description, not the new one.
+	data, err := os.ReadFile(snapshots[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+	var snap config.SkillGraphConfig
+	if err := json.Unmarshal(data, &snap); err != nil {
+		t.Fatalf("snapshot not valid JSON: %v", err)
+	}
+	if snap.Descriptions["s"] != "original" {
+		t.Errorf("snapshot should capture pre-edit state, got descriptions: %v", snap.Descriptions)
+	}
+}
+
+func TestSnapshotRollingLimit(t *testing.T) {
+	tmpDir := t.TempDir()
+	historyDir := filepath.Join(tmpDir, "history")
+
+	cfg := config.SkillGraphConfig{Descriptions: map[string]string{"x": "v"}}
+	for i := 0; i < 7; i++ {
+		if err := saveSkillGraphSnapshot(historyDir, cfg); err != nil {
+			t.Fatalf("snapshot %d: %v", i, err)
+		}
+	}
+
+	files, err := filepath.Glob(filepath.Join(historyDir, "skillgraph_*.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(files) != 5 {
+		t.Errorf("expected 5 snapshots (rolling limit), got %d", len(files))
 	}
 }
 

@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/kurtisvg/skillful-mcp/internal/graph"
-	"github.com/kurtisvg/skillful-mcp/internal/mcpserver"
+	"github.com/jrodeiro5/skillgraph-mcp/internal/graph"
+	"github.com/jrodeiro5/skillgraph-mcp/internal/mcpserver"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
@@ -34,102 +34,78 @@ func newPlanWorkflow(mgr *mcpserver.Manager) func(context.Context, *mcp.CallTool
 			return result, nil, nil
 		}
 
-		goalLower := strings.ToLower(input.Goal)
-		words := strings.Fields(goalLower)
-
-		// Find target nodes matching goal keywords
-		var targets []*graph.Node
-		for _, n := range g.Nodes {
-			nameLower := strings.ToLower(n.Name)
-			descLower := strings.ToLower(n.Description)
-
-			matched := false
-			for _, w := range words {
-				if len(w) > 2 && (strings.Contains(nameLower, w) || strings.Contains(descLower, w)) {
-					matched = true
-					break
-				}
-			}
-			if matched {
-				targets = append(targets, n)
-			}
-		}
-
+		targets := matchGoalToNodes(g, input.Goal)
 		if len(targets) == 0 {
 			return &mcp.CallToolResult{
-				Content: []mcp.Content{&mcp.TextContent{Text: "No specific workflow path found in the capability graph for this goal. Try using different keywords."}},
+				Content: []mcp.Content{&mcp.TextContent{Text: "No matching tools found for this goal. Try `list_skills` to browse available skills."}},
 			}, nil, nil
 		}
 
 		var sb strings.Builder
-		sb.WriteString(fmt.Sprintf("Suggested Workflow Plan for: %q\n\n", input.Goal))
+		sb.WriteString(fmt.Sprintf("Workflow plan for: %q\n\n", input.Goal))
 
-		// For each target tool, trace its prerequisites and recommendations
 		seen := make(map[string]bool)
 		for _, target := range targets {
-			if target.Type != graph.NodeTool {
-				continue
-			}
-			if seen[target.ID] {
+			if target.Type != graph.NodeTool || seen[target.ID] {
 				continue
 			}
 			seen[target.ID] = true
 
-			sb.WriteString(fmt.Sprintf("--- Action Path for Tool: %s ---\n", target.Name))
-			if target.Description != "" {
-				sb.WriteString(fmt.Sprintf("Description: %s\n", target.Description))
+			chain := buildPrerequisiteChain(g, target.ID)
+			chain = append(chain, target)
+
+			sb.WriteString(fmt.Sprintf("## Path to %s\n", target.Name))
+			for i, node := range chain {
+				skill := findParentSkill(g, node.ID)
+				sb.WriteString(fmt.Sprintf("  %d. **%s**", i+1, node.Name))
+				if skill != nil {
+					sb.WriteString(fmt.Sprintf(" — via `use_skill(%q)`", skill.Name))
+				}
+				if node.Description != "" {
+					sb.WriteString(fmt.Sprintf("\n     %s", node.Description))
+				}
+				sb.WriteString("\n")
 			}
 
-			// Find prerequisites (nodes that are PREREQUISITE_FOR or HAS_TOOL)
-			var prerequisites []string
-			var nextSteps []string
-
+			var nexts []string
 			for _, e := range g.Edges {
-				if e.Target == target.ID {
-					if e.Type == graph.RelPrerequisiteFor {
-						prerequisites = append(prerequisites, fmt.Sprintf("- Run %s first (%s)", e.Source, e.Description))
-					}
+				if e.Source != target.ID {
+					continue
 				}
-				if e.Source == target.ID {
-					if e.Type == graph.RelPrerequisiteFor {
-						nextSteps = append(nextSteps, fmt.Sprintf("- Follow with %s (%s)", e.Target, e.Description))
-					} else if e.Type == graph.RelCommonNextStep {
-						nextSteps = append(nextSteps, fmt.Sprintf("- Commonly followed by %s (%s)", e.Target, e.Description))
+				if e.Type != graph.RelCommonNextStep && e.Type != graph.RelProduces {
+					continue
+				}
+				if n, ok := g.Nodes[e.Target]; ok {
+					label := n.Name
+					if e.Description != "" {
+						label += " (" + e.Description + ")"
 					}
+					nexts = append(nexts, "- "+label)
 				}
 			}
-
-			if len(prerequisites) > 0 {
-				sb.WriteString("Prerequisites / Inputs required:\n")
-				for _, p := range prerequisites {
-					sb.WriteString(p + "\n")
-				}
-			} else {
-				sb.WriteString("Prerequisites: None detected (can be run directly or as starter step)\n")
-			}
-
-			sb.WriteString(fmt.Sprintf("Execution: Call %s()\n", target.Name))
-
-			if len(nextSteps) > 0 {
-				sb.WriteString("Recommended next steps:\n")
-				for _, ns := range nextSteps {
-					sb.WriteString(ns + "\n")
+			if len(nexts) > 0 {
+				sb.WriteString("  After this:\n")
+				for _, ns := range nexts {
+					sb.WriteString("    " + ns + "\n")
 				}
 			}
 			sb.WriteString("\n")
 		}
 
-		// Also suggest any skills that match
-		var suggestedSkills []string
-		for _, target := range targets {
-			if target.Type == graph.NodeSkill {
-				suggestedSkills = append(suggestedSkills, fmt.Sprintf("- %s: %s", target.Name, target.Description))
+		var skills []string
+		for _, n := range targets {
+			if n.Type == graph.NodeSkill {
+				entry := fmt.Sprintf("- `use_skill(%q)`", n.Name)
+				if n.Description != "" {
+					entry += ": " + n.Description
+				}
+				skills = append(skills, entry)
 			}
 		}
-		if len(suggestedSkills) > 0 {
-			sb.WriteString("Relevant Skills / Server Areas to explore:\n")
-			for _, sk := range suggestedSkills {
-				sb.WriteString(sk + "\n")
+		if len(skills) > 0 {
+			sb.WriteString("## Skills to explore\n")
+			for _, s := range skills {
+				sb.WriteString(s + "\n")
 			}
 		}
 
@@ -137,4 +113,100 @@ func newPlanWorkflow(mgr *mcpserver.Manager) func(context.Context, *mcp.CallTool
 			Content: []mcp.Content{&mcp.TextContent{Text: sb.String()}},
 		}, nil, nil
 	}
+}
+
+// commonStopwords are filtered out before keyword matching to reduce noise.
+var commonStopwords = map[string]bool{
+	"the": true, "and": true, "for": true, "how": true, "to": true,
+	"with": true, "from": true, "that": true, "this": true, "into": true,
+	"use": true, "using": true, "can": true, "want": true, "need": true,
+	"get": true, "set": true, "all": true, "any": true, "its": true,
+	"are": true, "was": true, "has": true, "have": true, "had": true,
+	"will": true, "what": true, "then": true, "also": true, "when": true,
+	"make": true, "give": true, "show": true, "find": true, "list": true,
+}
+
+// matchGoalToNodes returns all nodes whose name or description shares a
+// meaningful keyword (length > 3, not a stopword) with the goal string.
+func matchGoalToNodes(g *graph.Graph, goal string) []*graph.Node {
+	words := strings.Fields(strings.ToLower(goal))
+	var keywords []string
+	for _, w := range words {
+		if len(w) > 3 && !commonStopwords[w] {
+			keywords = append(keywords, w)
+		}
+	}
+	if len(keywords) == 0 {
+		// Fall back to all non-stopwords of any length if filtering left nothing.
+		for _, w := range words {
+			if !commonStopwords[w] {
+				keywords = append(keywords, w)
+			}
+		}
+	}
+
+	var results []*graph.Node
+	for _, n := range g.Nodes {
+		nameLower := strings.ToLower(n.Name)
+		descLower := strings.ToLower(n.Description)
+		for _, kw := range keywords {
+			if strings.Contains(nameLower, kw) || strings.Contains(descLower, kw) {
+				results = append(results, n)
+				break
+			}
+		}
+	}
+	return results
+}
+
+// buildPrerequisiteChain walks backwards through PREREQUISITE_FOR and REQUIRES
+// edges from targetID and returns the dependency chain in execution order
+// (deepest prerequisite first, target excluded).
+func buildPrerequisiteChain(g *graph.Graph, targetID string) []*graph.Node {
+	visited := map[string]bool{targetID: true}
+	queue := []string{targetID}
+	var chain []*graph.Node
+
+	for len(queue) > 0 {
+		cur := queue[0]
+		queue = queue[1:]
+
+		for _, e := range g.Edges {
+			var prereqID string
+			switch {
+			case e.Target == cur && e.Type == graph.RelPrerequisiteFor:
+				prereqID = e.Source
+			case e.Source == cur && e.Type == graph.RelRequires:
+				prereqID = e.Target
+			}
+			if prereqID == "" || visited[prereqID] {
+				continue
+			}
+			n, ok := g.Nodes[prereqID]
+			if !ok || n.Type != graph.NodeTool {
+				continue
+			}
+			visited[prereqID] = true
+			chain = append(chain, n)
+			queue = append(queue, prereqID)
+		}
+	}
+
+	// Reverse so deepest prerequisites appear first.
+	for i, j := 0, len(chain)-1; i < j; i, j = i+1, j-1 {
+		chain[i], chain[j] = chain[j], chain[i]
+	}
+	return chain
+}
+
+// findParentSkill returns the Skill node connected to nodeID via a HAS_TOOL edge.
+func findParentSkill(g *graph.Graph, nodeID string) *graph.Node {
+	for _, e := range g.Edges {
+		if e.Target == nodeID && e.Type == graph.RelHasTool {
+			if n, ok := g.Nodes[e.Source]; ok && n.Type == graph.NodeSkill {
+				return n
+			}
+		}
+	}
+	return nil
 }

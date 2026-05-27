@@ -22,11 +22,11 @@ jobs:
         with:
           context: .
           load: true
-          tags: skillful-mcp:test
+          tags: skillgraph-mcp:test
           cache-from: type=gha
           cache-to: type=gha,mode=max
       - name: Verify container runs
         run: |
-          output=$(docker run --rm skillful-mcp:test --version 2>&1 || true)
+          output=$(docker run --rm skillgraph-mcp:test --version 2>&1 || true)
           echo "$output"
           echo "$output" | grep -q '[0-9]\.[0-9]\.[0-9]'

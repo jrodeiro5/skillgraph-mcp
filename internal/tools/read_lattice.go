@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/kurtisvg/skillful-mcp/internal/mcpserver"
+	"github.com/jrodeiro5/skillgraph-mcp/internal/mcpserver"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
@@ -15,27 +15,27 @@ type readLatticeInput struct {
 	FilePath string `json:"file_path" jsonschema:"relative path to the file inside .mcp_lattice (e.g., 'skills.md', 'relations.md', 'fetch_readme.md')"`
 }
 
-func RegisterReadLattice(s *mcp.Server, mgr *mcpserver.Manager) {
+func RegisterReadLattice(s *mcp.Server, mgr *mcpserver.Manager, latticeDir string) {
 	mcp.AddTool(
 		s,
 		&mcp.Tool{
 			Name:        "read_lattice",
 			Description: "Read markdown documentation from the semantic lattice folder to understand detailed capabilities and server READMEs.",
 		},
-		newReadLattice(mgr),
+		newReadLattice(mgr, latticeDir),
 	)
 }
 
-func newReadLattice(mgr *mcpserver.Manager) func(context.Context, *mcp.CallToolRequest, readLatticeInput) (*mcp.CallToolResult, any, error) {
+func newReadLattice(mgr *mcpserver.Manager, latticeDir string) func(context.Context, *mcp.CallToolRequest, readLatticeInput) (*mcp.CallToolResult, any, error) {
 	return func(ctx context.Context, req *mcp.CallToolRequest, input readLatticeInput) (*mcp.CallToolResult, any, error) {
-		latticeDir, err := filepath.Abs("./.mcp_lattice")
+		absLatticeDir, err := filepath.Abs(latticeDir)
 		if err != nil {
 			result := &mcp.CallToolResult{}
 			result.SetError(fmt.Errorf("failed to locate lattice folder: %w", err))
 			return result, nil, nil
 		}
 
-		targetPath, err := filepath.Abs(filepath.Join(latticeDir, input.FilePath))
+		targetPath, err := filepath.Abs(filepath.Join(absLatticeDir, input.FilePath))
 		if err != nil {
 			result := &mcp.CallToolResult{}
 			result.SetError(fmt.Errorf("invalid path: %w", err))
@@ -43,7 +43,7 @@ func newReadLattice(mgr *mcpserver.Manager) func(context.Context, *mcp.CallToolR
 		}
 
 		// Security check: Prevent path traversal outside the lattice folder
-		if !strings.HasPrefix(targetPath, latticeDir) {
+		if !strings.HasPrefix(targetPath, absLatticeDir) {
 			result := &mcp.CallToolResult{}
 			result.SetError(fmt.Errorf("access denied: path traversal detected"))
 			return result, nil, nil

@@ -8,18 +8,19 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/kurtisvg/skillful-mcp/internal/app"
-	"github.com/kurtisvg/skillful-mcp/internal/config"
-	"github.com/kurtisvg/skillful-mcp/internal/docs"
-	"github.com/kurtisvg/skillful-mcp/internal/mcpserver"
-	"github.com/kurtisvg/skillful-mcp/internal/refine"
-	"github.com/kurtisvg/skillful-mcp/internal/version"
+	"github.com/jrodeiro5/skillgraph-mcp/internal/app"
+	"github.com/jrodeiro5/skillgraph-mcp/internal/config"
+	"github.com/jrodeiro5/skillgraph-mcp/internal/docs"
+	"github.com/jrodeiro5/skillgraph-mcp/internal/mcpserver"
+	"github.com/jrodeiro5/skillgraph-mcp/internal/refine"
+	"github.com/jrodeiro5/skillgraph-mcp/internal/version"
 
 	flag "github.com/spf13/pflag"
 )
 
 type options struct {
 	configPath string
+	latticeDir string
 	transport  string
 	host       string
 	port       string
@@ -30,6 +31,7 @@ func parseFlags(args []string) options {
 	var opts options
 	fs := flag.NewFlagSet("skillgraph-mcp", flag.ExitOnError)
 	fs.StringVar(&opts.configPath, "config", "./mcp.json", "Path to MCP config file")
+	fs.StringVar(&opts.latticeDir, "lattice-dir", "./.mcp_lattice", "Directory for traces, READMEs, and lattice docs")
 	fs.StringVar(&opts.transport, "transport", "stdio", "Upstream transport: stdio or http")
 	fs.StringVar(&opts.host, "host", "localhost", "HTTP host (when transport=http)")
 	fs.StringVar(&opts.port, "port", "8080", "HTTP port (when transport=http)")
@@ -79,15 +81,14 @@ func Execute() {
 	slog.Info("connected to servers", "servers", mgr.ListServerNames())
 
 	// Generate the semantic markdown documentation lattice
-	latticeDir := "./.mcp_lattice"
-	if err := docs.GenerateLattice(ctx, latticeDir, servers, mgr.GetGraph()); err != nil {
+	if err := docs.GenerateLattice(ctx, opts.latticeDir, servers, mgr.GetGraph()); err != nil {
 		slog.Warn("failed to generate semantic lattice", "error", err)
 	}
 
 	// Trigger asynchronous LLM metadata refinement for new/undescribed servers
-	refine.StartRefinementLoop(ctx, opts.configPath, mgr, latticeDir, servers)
+	refine.StartRefinementLoop(ctx, opts.configPath, mgr, opts.latticeDir, servers)
 
-	s := app.NewServer(mgr)
+	s := app.NewServer(mgr, opts.latticeDir)
 	var serveErr error
 	switch opts.transport {
 	case "stdio":

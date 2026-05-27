@@ -9,7 +9,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kurtisvg/skillful-mcp/internal/mcpserver"
+	"github.com/jrodeiro5/skillgraph-mcp/internal/mcpserver"
+	"github.com/jrodeiro5/skillgraph-mcp/internal/trace"
 
 	monty "github.com/ewhauser/gomonty"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -366,11 +367,11 @@ func TestExecuteCodeTrajectoryLogging(t *testing.T) {
 	}
 
 	// Clean/prepare traces directory
-	tracesDir := filepath.Join(".", ".mcp_lattice", "traces")
+	latticeDir := t.TempDir()
+	tracesDir := filepath.Join(latticeDir, "traces")
 	_ = os.RemoveAll(tracesDir)
-	defer os.RemoveAll(tracesDir)
 
-	fn := newExecuteCode(mgr)
+	fn := newExecuteCode(mgr, latticeDir)
 	req := &mcp.CallToolRequest{}
 	input := executeCodeInput{
 		Code: `greet("world")`,
@@ -404,7 +405,7 @@ func TestExecuteCodeTrajectoryLogging(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	var traj Trajectory
+	var traj trace.Trajectory
 	if err := json.Unmarshal(data, &traj); err != nil {
 		t.Fatalf("failed to unmarshal trajectory: %v", err)
 	}

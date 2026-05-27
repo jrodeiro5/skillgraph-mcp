@@ -1,6 +1,6 @@
 package main
 
-import "github.com/kurtisvg/skillful-mcp/cmd"
+import "github.com/jrodeiro5/skillgraph-mcp/cmd"
 
 func main() {
 	cmd.Execute()

@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/kurtisvg/skillful-mcp/internal/mcpserver"
+	"github.com/jrodeiro5/skillgraph-mcp/internal/mcpserver"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 

@@ -1,4 +1,4 @@
-module github.com/kurtisvg/skillful-mcp
+module github.com/jrodeiro5/skillgraph-mcp
 
 go 1.26.1
 

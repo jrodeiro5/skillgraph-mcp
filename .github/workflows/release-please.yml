@@ -63,7 +63,7 @@ jobs:
       - uses: docker/metadata-action@v6
         id: meta
         with:
-          images: ghcr.io/kurtisvg/skillful-mcp
+          images: ghcr.io/jrodeiro5/skillgraph-mcp
           tags: |
             type=semver,pattern={{version}},value=${{ inputs.tag || needs.release-please.outputs.tag_name }}
             type=semver,pattern={{major}}.{{minor}},value=${{ inputs.tag || needs.release-please.outputs.tag_name }}

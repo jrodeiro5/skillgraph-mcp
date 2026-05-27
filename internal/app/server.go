@@ -7,15 +7,15 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/kurtisvg/skillful-mcp/internal/mcpserver"
-	"github.com/kurtisvg/skillful-mcp/internal/tools"
-	"github.com/kurtisvg/skillful-mcp/internal/version"
+	"github.com/jrodeiro5/skillgraph-mcp/internal/mcpserver"
+	"github.com/jrodeiro5/skillgraph-mcp/internal/tools"
+	"github.com/jrodeiro5/skillgraph-mcp/internal/version"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
 // NewServer creates an MCP server with all tools registered.
-func NewServer(mgr *mcpserver.Manager) *mcp.Server {
+func NewServer(mgr *mcpserver.Manager, latticeDir string) *mcp.Server {
 	s := mcp.NewServer(&mcp.Implementation{
 		Name:    "skillgraph-mcp",
 		Version: version.Version,
@@ -24,10 +24,10 @@ func NewServer(mgr *mcpserver.Manager) *mcp.Server {
 	tools.RegisterListSkills(s, mgr)
 	tools.RegisterUseSkill(s, mgr)
 	tools.RegisterReadResource(s, mgr)
-	tools.RegisterExecuteCode(s, mgr)
+	tools.RegisterExecuteCode(s, mgr, latticeDir)
 	tools.RegisterGetSkillGraph(s, mgr)
 	tools.RegisterPlanWorkflow(s, mgr)
-	tools.RegisterReadLattice(s, mgr)
+	tools.RegisterReadLattice(s, mgr, latticeDir)
 
 	return s
 }

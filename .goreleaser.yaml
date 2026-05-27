@@ -1,9 +1,9 @@
 version: 2
-project_name: skillful-mcp
+project_name: skillgraph-mcp
 
 builds:
   - main: .
-    binary: skillful-mcp
+    binary: skillgraph-mcp
     env:
       - CGO_ENABLED=0
     goos:

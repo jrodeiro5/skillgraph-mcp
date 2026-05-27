@@ -50,3 +50,22 @@ Este documento detalla las tareas pendientes para implementar un modelo de grafo
 - [x] Validar que las propuestas no contengan nodos alucinados antes de persistir los cambios en la configuración.
 - [x] Escribir pruebas unitarias correspondientes en `execute_code_test.go` y `engine_test.go` para verificar el correcto funcionamiento.
 
+## Fase 8: Puerta de Validación SkillOpt [Completado]
+- [x] Añadir salida anticipada en `optimizeTraces`: omitir la llamada al LLM cuando el lote no contiene ningún error (ni `traj.Error` ni `is_error: true` en llamadas a herramientas).
+- [x] Eliminar archivos de traza procesados incluso cuando se salta el LLM, para evitar acumulación infinita.
+- [x] Escribir `TestOptimizeTracesSkipsLLMWhenNoErrors` para verificar el comportamiento.
+
+## Fase 9: Soporte Multi-proveedor LLM [Completado]
+- [x] Añadir `callOpenAICompat` en `refine/engine.go` — compatible con LiteLLM proxy, Ollama, OpenAI y cualquier API OpenAI-compatible.
+- [x] Actualizar `getAPIKey` para dar prioridad a `LLM_BASE_URL` / `LLM_API_KEY` / `LLM_MODEL` antes que a los proveedores específicos.
+- [x] Añadir soporte para `OPENAI_API_KEY` como proveedor de OpenAI nativo.
+- [x] Actualizar `refineServer` y `optimizeTraces` con un `switch` de proveedor que incluya el caso `"openai"`.
+- [x] Permitir clave vacía para servidores locales sin autenticación (Ollama): omitir la cabecera `Authorization` cuando la clave está vacía.
+- [x] Escribir `TestCallOpenAICompat`, `TestCallOpenAICompatNoKey` y `TestGetAPIKeyLLMBaseURL`.
+
+## Mejoras Planificadas
+
+- [ ] **Puerta de validación con hold-out**: aceptar edits de SkillOpt solo si no hacen regresar un conjunto de trazas de referencia (alineado con el paper arXiv:2605.23904 que usa validación en conjunto separado).
+- [ ] **Historial de ediciones con rollback**: guardar un historial de cambios en `mcp.json` para poder revertir automáticamente si la calidad del routing degrada.
+- [ ] **Ablación de topología del grafo**: comparar relaciones tipadas (`PRODUCES`, `REQUIRES`) contra un grafo plano para medir el valor añadido real.
+

@@ -12,6 +12,7 @@ import (
 
 	"github.com/jrodeiro5/skillgraph-mcp/internal/config"
 	"github.com/jrodeiro5/skillgraph-mcp/internal/mcpserver"
+	"github.com/jrodeiro5/skillgraph-mcp/internal/trace"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
@@ -311,7 +312,7 @@ func TestOptimizeTracesSkipsLLMWhenNoErrors(t *testing.T) {
 	deepseekEndpoint = mockServer.URL
 	defer func() { deepseekEndpoint = oldDS }()
 
-	if err := optimizeTraces(ctx, "deepseek", "key", configPath, mgr, latticeDir, servers, []string{tracePath}); err != nil {
+	if err := optimizeTraces(ctx, "deepseek", "key", configPath, mgr, latticeDir, servers, []string{tracePath}, nil); err != nil {
 		t.Fatalf("optimizeTraces failed: %v", err)
 	}
 
@@ -455,7 +456,7 @@ func TestSnapshotCreatedBeforeEdit(t *testing.T) {
 	deepseekEndpoint = mockServer.URL
 	defer func() { deepseekEndpoint = old }()
 
-	if err := optimizeTraces(ctx, "deepseek", "key", configPath, mgr, latticeDir, servers, []string{tracePath}); err != nil {
+	if err := optimizeTraces(ctx, "deepseek", "key", configPath, mgr, latticeDir, servers, []string{tracePath}, nil); err != nil {
 		t.Fatalf("optimizeTraces: %v", err)
 	}
 
@@ -619,7 +620,7 @@ func TestOptimizeTracesExecution(t *testing.T) {
 	defer func() { deepseekEndpoint = oldDS }()
 
 	// Call optimizeTraces
-	err = optimizeTraces(ctx, "deepseek", "dummy-key", configPath, mgr, latticeDir, servers, []string{tracePath})
+	err = optimizeTraces(ctx, "deepseek", "dummy-key", configPath, mgr, latticeDir, servers, []string{tracePath}, nil)
 	if err != nil {
 		t.Fatalf("optimizeTraces failed: %v", err)
 	}
@@ -654,5 +655,155 @@ func TestOptimizeTracesExecution(t *testing.T) {
 	// Verify trace file was deleted
 	if _, err := os.Stat(tracePath); !os.IsNotExist(err) {
 		t.Errorf("expected trace file to be deleted, but it still exists")
+	}
+}
+
+func TestSplitHoldout(t *testing.T) {
+	tests := []struct {
+		files    []string
+		wantHO   int
+		wantOpt  int
+	}{
+		{[]string{"a", "b", "c"}, 0, 3},         // < 4 → no hold-out
+		{[]string{"a", "b", "c", "d"}, 1, 3},    // 4 files → 1 hold-out
+		{[]string{"a", "b", "c", "d", "e", "f"}, 2, 4}, // 6 files → 2 hold-out
+		{[]string{"a", "b", "c", "d", "e", "f", "g", "h", "i"}, 3, 6}, // 9 → 3 hold-out
+	}
+	for _, tt := range tests {
+		ho, opt := splitHoldout(tt.files)
+		if len(ho) != tt.wantHO {
+			t.Errorf("splitHoldout(%d files): holdOut len = %d, want %d", len(tt.files), len(ho), tt.wantHO)
+		}
+		if len(opt) != tt.wantOpt {
+			t.Errorf("splitHoldout(%d files): opt len = %d, want %d", len(tt.files), len(opt), tt.wantOpt)
+		}
+	}
+}
+
+func TestWordSet(t *testing.T) {
+	words := wordSet("Search for documents by query parameter")
+	for _, want := range []string{"search", "documents", "query", "parameter"} {
+		if !words[want] {
+			t.Errorf("wordSet: expected %q in result", want)
+		}
+	}
+	// Stop words and short words should be excluded.
+	for _, skip := range []string{"for", "with", "this", "that", "by"} {
+		if words[skip] {
+			t.Errorf("wordSet: %q should be excluded", skip)
+		}
+	}
+}
+
+func TestPassesHoldoutGate(t *testing.T) {
+	successTrace := trace.Trajectory{
+		Code: "search for documents using query string",
+		ToolCalls: []trace.ToolCallTrace{
+			{ToolName: "search_tool", IsError: false},
+		},
+	}
+
+	t.Run("no hold-out data always accepts", func(t *testing.T) {
+		if !passesHoldoutGate("search_tool", "unrelated description", "also unrelated", nil) {
+			t.Error("expected accept with no hold-out data")
+		}
+	})
+
+	t.Run("improved description accepted", func(t *testing.T) {
+		// Proposed has more overlap with the trace than current.
+		proposed := "search for documents by query"
+		current := "processes stuff"
+		if !passesHoldoutGate("search_tool", proposed, current, []trace.Trajectory{successTrace}) {
+			t.Error("expected improved description to pass gate")
+		}
+	})
+
+	t.Run("regressing description rejected", func(t *testing.T) {
+		// Proposed has zero overlap; current has overlap with trace words.
+		proposed := "processes data pipelines"
+		current := "search for documents by query parameter"
+		if passesHoldoutGate("search_tool", proposed, current, []trace.Trajectory{successTrace}) {
+			t.Error("expected regressing description to be rejected by gate")
+		}
+	})
+
+	t.Run("irrelevant tool always accepted", func(t *testing.T) {
+		// Hold-out has no successful calls to other_tool.
+		if !passesHoldoutGate("other_tool", "anything", "anything", []trace.Trajectory{successTrace}) {
+			t.Error("expected accept when tool has no relevant hold-out traces")
+		}
+	})
+}
+
+func TestHoldoutGateFiltersRegressionInOptimize(t *testing.T) {
+	ctx := context.Background()
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "mcp.json")
+	latticeDir := filepath.Join(tmpDir, ".mcp_lattice")
+
+	initial := `{"mcpServers":{"s":{"command":"x"}},"skillGraph":{"descriptions":{"tool_a":"search for documents by query"}}}`
+	if err := os.WriteFile(configPath, []byte(initial), 0644); err != nil {
+		t.Fatal(err)
+	}
+	servers, _, err := config.Load(configPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	session := startFakeServer(t, ctx, []string{"tool_a"})
+	defer session.Close()
+	srv, err := mcpserver.NewServerFromSession(ctx, session)
+	if err != nil {
+		t.Fatal(err)
+	}
+	mgr, err := mcpserver.NewManagerFromServers(map[string]*mcpserver.Server{"s": srv})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	tracesDir := filepath.Join(latticeDir, "traces")
+	if err := os.MkdirAll(tracesDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	// Optimization trace: error, so LLM is called.
+	optPath := filepath.Join(tracesDir, "opt.json")
+	optTrace := `{"timestamp":"2026-05-27T10:00:00Z","code":"tool_a()","tool_calls":[{"tool_name":"tool_a","args":{},"result":"error","is_error":true}],"error":"bad"}`
+	if err := os.WriteFile(optPath, []byte(optTrace), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	// Hold-out trace: success calling tool_a with search-related code.
+	hoPath := filepath.Join(tracesDir, "holdout.json")
+	hoTrace := `{"timestamp":"2026-05-27T09:00:00Z","code":"search for documents by query","tool_calls":[{"tool_name":"tool_a","args":{},"result":"ok","is_error":false}],"output":"ok"}`
+	if err := os.WriteFile(hoPath, []byte(hoTrace), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	// LLM proposes a description that has zero overlap with the hold-out trace.
+	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]any{
+			"choices": []map[string]any{
+				{"message": map[string]string{"content": `{"descriptions":{"tool_a":"processes unrelated data pipelines"},"relations":[]}`}},
+			},
+		})
+	}))
+	defer mockServer.Close()
+	old := deepseekEndpoint
+	deepseekEndpoint = mockServer.URL
+	defer func() { deepseekEndpoint = old }()
+
+	if err := optimizeTraces(ctx, "deepseek", "key", configPath, mgr, latticeDir, servers, []string{optPath}, []string{hoPath}); err != nil {
+		t.Fatalf("optimizeTraces: %v", err)
+	}
+
+	// The regressing description must NOT have been written.
+	_, updated, err := config.Load(configPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if updated.Descriptions["tool_a"] != "search for documents by query" {
+		t.Errorf("hold-out gate failed: description was changed to %q", updated.Descriptions["tool_a"])
 	}
 }

@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
@@ -460,6 +461,106 @@ func callGemini(ctx context.Context, key, system, user string) (string, error) {
 	return data.Candidates[0].Content.Parts[0].Text, nil
 }
 
+// splitHoldout partitions files (sorted chronologically) into a hold-out set
+// (oldest third) and an optimization set. Returns nil hold-out when fewer than
+// 4 files are available — not enough data for meaningful validation.
+func splitHoldout(files []string) (holdOut, optimization []string) {
+	if len(files) < 4 {
+		return nil, files
+	}
+	n := len(files) / 3
+	return files[:n], files[n:]
+}
+
+var skipWords = map[string]bool{
+	"this": true, "that": true, "with": true, "from": true,
+	"have": true, "been": true, "will": true, "when": true,
+	"then": true, "your": true, "more": true, "some": true,
+	"each": true, "they": true, "them": true, "their": true,
+	"used": true, "uses": true, "using": true,
+}
+
+// wordSet tokenizes s into a set of lowercase words longer than 3 characters,
+// excluding common stop words. Used as a routing-relevance proxy.
+func wordSet(s string) map[string]bool {
+	words := make(map[string]bool)
+	lower := strings.ToLower(s)
+	start := -1
+	for i, r := range lower {
+		isAlnum := (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9')
+		if isAlnum {
+			if start == -1 {
+				start = i
+			}
+		} else if start != -1 {
+			w := lower[start:i]
+			if len(w) > 3 && !skipWords[w] {
+				words[w] = true
+			}
+			start = -1
+		}
+	}
+	if start != -1 {
+		w := lower[start:]
+		if len(w) > 3 && !skipWords[w] {
+			words[w] = true
+		}
+	}
+	return words
+}
+
+// overlapScore returns the fraction of trace vocabulary (code + tool names)
+// that is present in desc. Higher means desc is more relevant to the trace.
+func overlapScore(desc string, traj trace.Trajectory) float64 {
+	descWords := wordSet(desc)
+	if len(descWords) == 0 {
+		return 0
+	}
+	var sb strings.Builder
+	sb.WriteString(traj.Code)
+	for _, tc := range traj.ToolCalls {
+		sb.WriteString(" ")
+		sb.WriteString(tc.ToolName)
+	}
+	taskWords := wordSet(sb.String())
+	if len(taskWords) == 0 {
+		return 0
+	}
+	count := 0
+	for w := range descWords {
+		if taskWords[w] {
+			count++
+		}
+	}
+	return float64(count) / float64(len(taskWords))
+}
+
+// passesHoldoutGate returns true if replacing current with proposed for toolName
+// does not regress routing accuracy on the majority of relevant hold-out traces.
+// A trace is "relevant" if it successfully invoked toolName.
+// With no hold-out data, every edit is accepted.
+func passesHoldoutGate(toolName, proposed, current string, holdOut []trace.Trajectory) bool {
+	var relevant []trace.Trajectory
+	for _, t := range holdOut {
+		for _, tc := range t.ToolCalls {
+			if tc.ToolName == toolName && !tc.IsError {
+				relevant = append(relevant, t)
+				break
+			}
+		}
+	}
+	if len(relevant) == 0 {
+		return true
+	}
+	pass := 0
+	for _, t := range relevant {
+		if overlapScore(proposed, t) >= overlapScore(current, t) {
+			pass++
+		}
+	}
+	return pass*2 >= len(relevant)
+}
+
 func startOptimizationLoop(ctx context.Context, provider, key, configPath string, mgr *mcpserver.Manager, latticeDir string, servers map[string]config.Server) {
 	ticker := time.NewTicker(30 * time.Second)
 	defer ticker.Stop()
@@ -487,14 +588,31 @@ func startOptimizationLoop(ctx context.Context, provider, key, configPath string
 				files = files[:10]
 			}
 
-			if err := optimizeTraces(ctx, provider, key, configPath, mgr, latticeDir, servers, files); err != nil {
+			// Sort chronologically (nanosecond-timestamp prefix: lex == time order),
+			// then split into hold-out (oldest third) and optimization set.
+			sort.Strings(files)
+			holdOutFiles, optFiles := splitHoldout(files)
+
+			if err := optimizeTraces(ctx, provider, key, configPath, mgr, latticeDir, servers, optFiles, holdOutFiles); err != nil {
 				slog.Error("RefinementEngine: SkillOpt optimization trace failed", "error", err)
 			}
 		}
 	}
 }
 
-func optimizeTraces(ctx context.Context, provider, key, configPath string, mgr *mcpserver.Manager, latticeDir string, servers map[string]config.Server, files []string) error {
+func optimizeTraces(ctx context.Context, provider, key, configPath string, mgr *mcpserver.Manager, latticeDir string, servers map[string]config.Server, files []string, holdOutFiles []string) error {
+	var holdOutTrajectories []trace.Trajectory
+	for _, f := range holdOutFiles {
+		data, err := os.ReadFile(f)
+		if err != nil {
+			continue
+		}
+		var t trace.Trajectory
+		if err := json.Unmarshal(data, &t); err == nil {
+			holdOutTrajectories = append(holdOutTrajectories, t)
+		}
+	}
+
 	var trajectories []trace.Trajectory
 	for _, f := range files {
 		data, err := os.ReadFile(f)
@@ -655,10 +773,15 @@ Guidelines:
 
 	modified := false
 	for k, v := range edits.Descriptions {
-		if validNames[k] {
-			currentGraphCfg.Descriptions[k] = v
-			modified = true
+		if !validNames[k] {
+			continue
 		}
+		if !passesHoldoutGate(k, v, currentGraphCfg.Descriptions[k], holdOutTrajectories) {
+			slog.Warn("RefinementEngine: SkillOpt hold-out gate rejected description edit", "tool", k)
+			continue
+		}
+		currentGraphCfg.Descriptions[k] = v
+		modified = true
 	}
 
 	for _, rel := range edits.Relations {
@@ -705,8 +828,8 @@ Guidelines:
 		slog.Info("RefinementEngine: SkillOpt applied edits to configuration successfully")
 	}
 
-	// Delete trace files after successful processing
-	for _, f := range files {
+	// Delete all trace files (optimization + hold-out) after successful processing.
+	for _, f := range append(files, holdOutFiles...) {
 		_ = os.Remove(f)
 	}
 

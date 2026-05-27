@@ -312,7 +312,7 @@ func TestOptimizeTracesSkipsLLMWhenNoErrors(t *testing.T) {
 	deepseekEndpoint = mockServer.URL
 	defer func() { deepseekEndpoint = oldDS }()
 
-	if err := optimizeTraces(ctx, "deepseek", "key", configPath, mgr, latticeDir, servers, []string{tracePath}, nil); err != nil {
+	if _, err := optimizeTraces(ctx, "deepseek", "key", configPath, mgr, latticeDir, servers, []string{tracePath}, nil); err != nil {
 		t.Fatalf("optimizeTraces failed: %v", err)
 	}
 
@@ -456,7 +456,7 @@ func TestSnapshotCreatedBeforeEdit(t *testing.T) {
 	deepseekEndpoint = mockServer.URL
 	defer func() { deepseekEndpoint = old }()
 
-	if err := optimizeTraces(ctx, "deepseek", "key", configPath, mgr, latticeDir, servers, []string{tracePath}, nil); err != nil {
+	if _, err := optimizeTraces(ctx, "deepseek", "key", configPath, mgr, latticeDir, servers, []string{tracePath}, nil); err != nil {
 		t.Fatalf("optimizeTraces: %v", err)
 	}
 
@@ -620,7 +620,7 @@ func TestOptimizeTracesExecution(t *testing.T) {
 	defer func() { deepseekEndpoint = oldDS }()
 
 	// Call optimizeTraces
-	err = optimizeTraces(ctx, "deepseek", "dummy-key", configPath, mgr, latticeDir, servers, []string{tracePath}, nil)
+	_, err = optimizeTraces(ctx, "deepseek", "dummy-key", configPath, mgr, latticeDir, servers, []string{tracePath}, nil)
 	if err != nil {
 		t.Fatalf("optimizeTraces failed: %v", err)
 	}
@@ -794,7 +794,7 @@ func TestHoldoutGateFiltersRegressionInOptimize(t *testing.T) {
 	deepseekEndpoint = mockServer.URL
 	defer func() { deepseekEndpoint = old }()
 
-	if err := optimizeTraces(ctx, "deepseek", "key", configPath, mgr, latticeDir, servers, []string{optPath}, []string{hoPath}); err != nil {
+	if _, err := optimizeTraces(ctx, "deepseek", "key", configPath, mgr, latticeDir, servers, []string{optPath}, []string{hoPath}); err != nil {
 		t.Fatalf("optimizeTraces: %v", err)
 	}
 
@@ -805,5 +805,89 @@ func TestHoldoutGateFiltersRegressionInOptimize(t *testing.T) {
 	}
 	if updated.Descriptions["tool_a"] != "search for documents by query" {
 		t.Errorf("hold-out gate failed: description was changed to %q", updated.Descriptions["tool_a"])
+	}
+}
+
+func TestComputeErrRate(t *testing.T) {
+	dir := t.TempDir()
+	write := func(name, content string) string {
+		p := filepath.Join(dir, name)
+		if err := os.WriteFile(p, []byte(content), 0644); err != nil {
+			t.Fatal(err)
+		}
+		return p
+	}
+
+	ok := write("ok.json", `{"timestamp":"2026-05-27T10:00:00Z","code":"x","tool_calls":[{"tool_name":"t","args":{},"result":"ok","is_error":false}],"output":"ok"}`)
+	bad := write("bad.json", `{"timestamp":"2026-05-27T10:00:01Z","code":"x","tool_calls":[{"tool_name":"t","args":{},"result":"err","is_error":true}],"error":"fail"}`)
+	junk := write("junk.json", `not json`)
+
+	rate := computeErrRate([]string{ok, bad, junk})
+	// junk is skipped; 1 error out of 2 valid traces = 0.5
+	if rate != 0.5 {
+		t.Errorf("expected 0.5, got %v", rate)
+	}
+	if computeErrRate(nil) != 0 {
+		t.Error("empty files should return 0")
+	}
+}
+
+func TestRollbackToLatestSnapshot(t *testing.T) {
+	ctx := context.Background()
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "mcp.json")
+	historyDir := filepath.Join(tmpDir, "history")
+
+	// Write current config with "edited" description.
+	current := `{"mcpServers":{"s":{"command":"x"}},"skillGraph":{"descriptions":{"tool_a":"edited description"}}}`
+	if err := os.WriteFile(configPath, []byte(current), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	// Save a snapshot with the "original" description.
+	original := config.SkillGraphConfig{
+		Descriptions: map[string]string{"tool_a": "original description"},
+	}
+	if err := saveSkillGraphSnapshot(historyDir, original); err != nil {
+		t.Fatal(err)
+	}
+
+	session := startFakeServer(t, ctx, []string{"tool_a"})
+	defer session.Close()
+	srv, err := mcpserver.NewServerFromSession(ctx, session)
+	if err != nil {
+		t.Fatal(err)
+	}
+	mgr, err := mcpserver.NewManagerFromServers(map[string]*mcpserver.Server{"s": srv})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Rollback should restore the original description.
+	if err := rollbackToLatestSnapshot(configPath, historyDir, mgr); err != nil {
+		t.Fatalf("rollback failed: %v", err)
+	}
+
+	_, updated, err := config.Load(configPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if updated.Descriptions["tool_a"] != "original description" {
+		t.Errorf("expected original description after rollback, got %q", updated.Descriptions["tool_a"])
+	}
+
+	// Graph should also be rebuilt with the restored description.
+	if n, ok := mgr.GetGraph().Nodes["tool_a"]; ok {
+		if n.Description != "original description" {
+			t.Errorf("graph node description not updated: %q", n.Description)
+		}
+	}
+}
+
+func TestRollbackNoSnapshots(t *testing.T) {
+	tmpDir := t.TempDir()
+	err := rollbackToLatestSnapshot(filepath.Join(tmpDir, "mcp.json"), filepath.Join(tmpDir, "history"), nil)
+	if err == nil {
+		t.Error("expected error when no snapshots exist")
 	}
 }

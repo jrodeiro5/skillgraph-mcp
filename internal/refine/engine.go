@@ -561,11 +561,75 @@ func passesHoldoutGate(toolName, proposed, current string, holdOut []trace.Traje
 	return pass*2 >= len(relevant)
 }
 
+// rollbackThreshold is the minimum relative increase in error rate that triggers
+// an automatic rollback to the pre-edit snapshot.
+const rollbackThreshold = 1.5
+
+// computeErrRate returns the fraction of traces in files that contain an error.
+func computeErrRate(files []string) float64 {
+	total, errCount := 0, 0
+	for _, f := range files {
+		data, err := os.ReadFile(f)
+		if err != nil {
+			continue
+		}
+		var t trace.Trajectory
+		if json.Unmarshal(data, &t) != nil {
+			continue
+		}
+		total++
+		if t.Error != "" {
+			errCount++
+			continue
+		}
+		for _, tc := range t.ToolCalls {
+			if tc.IsError {
+				errCount++
+				break
+			}
+		}
+	}
+	if total == 0 {
+		return 0
+	}
+	return float64(errCount) / float64(total)
+}
+
+// rollbackToLatestSnapshot restores the most recent pre-edit snapshot from
+// historyDir into configPath and rebuilds the in-memory graph.
+func rollbackToLatestSnapshot(configPath, historyDir string, mgr *mcpserver.Manager) error {
+	files, err := filepath.Glob(filepath.Join(historyDir, "skillgraph_*.json"))
+	if err != nil || len(files) == 0 {
+		return fmt.Errorf("no snapshots available in %s", historyDir)
+	}
+	sort.Strings(files) // nanosecond-timestamp prefix: last entry is most recent
+	data, err := os.ReadFile(files[len(files)-1])
+	if err != nil {
+		return fmt.Errorf("reading snapshot: %w", err)
+	}
+	var cfg config.SkillGraphConfig
+	if err := json.Unmarshal(data, &cfg); err != nil {
+		return fmt.Errorf("parsing snapshot: %w", err)
+	}
+	if err := config.SaveSkillGraph(configPath, &cfg); err != nil {
+		return fmt.Errorf("applying snapshot: %w", err)
+	}
+	mgr.RebuildGraph(&cfg)
+	slog.Info("RefinementEngine: rolled back to snapshot", "file", files[len(files)-1])
+	return nil
+}
+
 func startOptimizationLoop(ctx context.Context, provider, key, configPath string, mgr *mcpserver.Manager, latticeDir string, servers map[string]config.Server) {
 	ticker := time.NewTicker(30 * time.Second)
 	defer ticker.Stop()
 
 	tracesDir := filepath.Join(latticeDir, "traces")
+	historyDir := filepath.Join(latticeDir, "history")
+
+	var (
+		lastErrRate float64 = -1 // -1 = no baseline established yet
+		lastEdited  bool
+	)
 
 	for {
 		select {
@@ -593,14 +657,33 @@ func startOptimizationLoop(ctx context.Context, provider, key, configPath string
 			sort.Strings(files)
 			holdOutFiles, optFiles := splitHoldout(files)
 
-			if err := optimizeTraces(ctx, provider, key, configPath, mgr, latticeDir, servers, optFiles, holdOutFiles); err != nil {
+			// Auto-rollback: if the previous cycle made edits and the current
+			// batch shows a significantly higher error rate, revert.
+			currErrRate := computeErrRate(optFiles)
+			if lastEdited && lastErrRate >= 0 && currErrRate > lastErrRate*rollbackThreshold {
+				slog.Warn("RefinementEngine: error rate increased after last edit — rolling back",
+					"before", lastErrRate, "after", currErrRate)
+				if rbErr := rollbackToLatestSnapshot(configPath, historyDir, mgr); rbErr != nil {
+					slog.Error("RefinementEngine: rollback failed", "error", rbErr)
+				}
+				lastEdited = false
+				lastErrRate = -1
+			}
+
+			edited, err := optimizeTraces(ctx, provider, key, configPath, mgr, latticeDir, servers, optFiles, holdOutFiles)
+			if err != nil {
 				slog.Error("RefinementEngine: SkillOpt optimization trace failed", "error", err)
+			} else if edited {
+				lastEdited = true
+				lastErrRate = currErrRate
+			} else {
+				lastEdited = false
 			}
 		}
 	}
 }
 
-func optimizeTraces(ctx context.Context, provider, key, configPath string, mgr *mcpserver.Manager, latticeDir string, servers map[string]config.Server, files []string, holdOutFiles []string) error {
+func optimizeTraces(ctx context.Context, provider, key, configPath string, mgr *mcpserver.Manager, latticeDir string, servers map[string]config.Server, files []string, holdOutFiles []string) (bool, error) {
 	var holdOutTrajectories []trace.Trajectory
 	for _, f := range holdOutFiles {
 		data, err := os.ReadFile(f)
@@ -626,7 +709,7 @@ func optimizeTraces(ctx context.Context, provider, key, configPath string, mgr *
 	}
 
 	if len(trajectories) == 0 {
-		return nil
+		return false, nil
 	}
 
 	// Skip LLM call when the batch has no errors — nothing to optimize.
@@ -649,7 +732,7 @@ outer:
 		for _, f := range files {
 			_ = os.Remove(f)
 		}
-		return nil
+		return false, nil
 	}
 
 	// 1. Gather all active servers and tools
@@ -744,7 +827,7 @@ Guidelines:
 		refinedJSON, err = callGemini(ctx, key, systemPrompt, userPrompt)
 	}
 	if err != nil {
-		return fmt.Errorf("calling LLM API: %w", err)
+		return false, fmt.Errorf("calling LLM API: %w", err)
 	}
 
 	type SkillOptEdits struct {
@@ -757,14 +840,14 @@ Guidelines:
 	if err := json.Unmarshal([]byte(refinedJSON), &edits); err != nil {
 		cleanJSON := cleanMarkdownJSON(refinedJSON)
 		if err := json.Unmarshal([]byte(cleanJSON), &edits); err != nil {
-			return fmt.Errorf("invalid JSON returned by LLM: %w. Raw: %s", err, refinedJSON)
+			return false, fmt.Errorf("invalid JSON returned by LLM: %w. Raw: %s", err, refinedJSON)
 		}
 	}
 
 	// Load config for merge
 	_, currentGraphCfg, err := config.Load(configPath)
 	if err != nil {
-		return fmt.Errorf("loading current config for merge: %w", err)
+		return false, fmt.Errorf("loading current config for merge: %w", err)
 	}
 
 	if currentGraphCfg.Descriptions == nil {
@@ -819,7 +902,7 @@ Guidelines:
 			slog.Warn("RefinementEngine: failed to save pre-edit snapshot", "error", snapErr)
 		}
 		if err := config.SaveSkillGraph(configPath, currentGraphCfg); err != nil {
-			return fmt.Errorf("saving refined config: %w", err)
+			return false, fmt.Errorf("saving refined config: %w", err)
 		}
 		mgr.RebuildGraph(currentGraphCfg)
 		if err := docs.GenerateLattice(ctx, latticeDir, servers, mgr.GetGraph()); err != nil {
@@ -833,6 +916,6 @@ Guidelines:
 		_ = os.Remove(f)
 	}
 
-	return nil
+	return modified, nil
 }
 

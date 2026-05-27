@@ -41,10 +41,46 @@ collapsing thousands of tokens down to a lightweight index.
 
 ## 💡 How it works
 
-```
-Agent  <--MCP-->  skillgraph-mcp  <--MCP-->  Database Server
-                                <--MCP-->  Filesystem Server
-                                <--MCP-->  API Server
+```mermaid
+flowchart LR
+    subgraph Agent["AI Agent"]
+        A["Claude Code\nGemini CLI\nCodex..."]
+    end
+
+    subgraph GW["skillgraph-mcp gateway  (8 tools)"]
+        direction TB
+        subgraph Discover["Discovery"]
+            T1["list_skills"]
+            T2["use_skill"]
+            T3["read_resource"]
+        end
+        subgraph Execute["Execution"]
+            T4["execute_code"]
+            T5["register_server"]
+        end
+        subgraph Graph["Graph & Planning"]
+            T6["get_skill_graph"]
+            T7["plan_workflow"]
+            T8["read_lattice"]
+        end
+        SG[("Semantic\nSkill Graph")]
+        SO["SkillOpt loop\ntraces → LLM → better descriptions"]
+        Discover --> SG
+        Graph --> SG
+        Execute -.->|"writes traces"| SO
+        SO -.->|"RebuildGraph"| SG
+    end
+
+    subgraph Servers["Downstream MCP Servers"]
+        S1["brave-search"]
+        S2["firecrawl"]
+        S3["context7"]
+        S4["gitnexus"]
+        S5["...any MCP server"]
+    end
+
+    A -- "8 tools via MCP" --> GW
+    GW -- "MCP (full schemas on demand)" --> Servers
 ```
 
 skillgraph-mcp reads a standard `mcp.json` config, connects to each downstream
@@ -66,6 +102,27 @@ The typical agent workflow:
 2. Call `get_skill_graph` or `plan_workflow` to inspect relations and plan the steps.
 3. Call `use_skill` to inspect a skill's tools and their input schemas.
 4. Use `execute_code` to orchestrate tool calls in a single round-trip.
+
+```mermaid
+sequenceDiagram
+    participant A as AI Agent
+    participant GW as skillgraph-mcp
+    participant S as Downstream Server
+
+    A->>GW: list_skills
+    GW-->>A: ["brave-search", "gitnexus", ...]
+
+    A->>GW: plan_workflow("search and summarise repo issues")
+    GW-->>A: 1. brave_search → 2. github_list_issues → 3. execute_code
+
+    A->>GW: use_skill("brave-search")
+    GW-->>A: brave_web_search(query, count, ...) schema
+
+    A->>GW: execute_code(python)
+    GW->>S: brave_web_search(...)
+    S-->>GW: results
+    GW-->>A: computed result + trace written
+```
 
 ### 🔄 Self-Evolving Optimization (SkillOpt)
 

@@ -9,7 +9,7 @@ Too many MCP tools slowing your agent down? Might be a Skill Issue 😉
 
 **skillgraph-mcp** eliminates tool bloat by building a semantic capability relationship graph and turning your MCP servers into Agent Skills in an MCP-native way.
 
-- 🔍 **Progressive Disclosure** — start with 4 tools, discover more as needed
+- 🔍 **Progressive Disclosure** — agent sees 7 lightweight tools; downstream schemas loaded on demand
 - ⚡ **Code Mode** — trigger and combine multiple tool calls with Python
 - 🔒 **Secure sandbox** — code executes in a sandbox, not your shell
 - 🔌 **Any MCP client** — works with Gemini CLI, Claude Code, Codex, and more
@@ -28,9 +28,9 @@ Connecting an agent to too many tools (or MCP servers) creates
 loaded into its context window before the user says a word. Accuracy drops,
 latency increases, and adding capabilities makes the agent worse.
 
-skillgraph-mcp fixes this through **progressive disclosure**. The agent sees just 4
-tools and discovers specific schemas on-demand, collapsing thousands of tokens
-down to a lightweight index.
+skillgraph-mcp fixes this through **progressive disclosure**. The agent sees 7
+lightweight gateway tools and discovers specific downstream schemas on-demand,
+collapsing thousands of tokens down to a lightweight index.
 
 [tool-bloat]: https://kvg.dev/posts/20260125-skills-and-mcp/
 
@@ -50,7 +50,7 @@ server, and exposes seven tools:
 | `list_skills`     | Returns the names of all configured downstream servers                           |
 | `use_skill`       | Lists the tools and resources available in a specific skill                      |
 | `read_resource`   | Reads a resource from a specific skill                                           |
-| `execute_code`    | Runs Python code in a secure [Monty](https://github.com/pydantic/monty) sandbox |
+| `execute_code`    | Runs Python code in a secure [gomonty](https://github.com/ewhauser/gomonty) sandbox |
 | `get_skill_graph` | Returns the capability relationship graph                                        |
 | `plan_workflow`   | Receives a high-level goal and returns a recommended path of execution           |
 | `read_lattice`    | Reads files from the generated `.mcp_lattice` semantic documentation index       |
@@ -119,7 +119,7 @@ names returned by `use_skill` always match the function names in `execute_code`.
 <summary><strong>Download a binary</strong></summary>
 
 ```sh
-VERSION="0.0.1"
+VERSION="0.1.0"
 OS="linux"       # or: darwin, windows
 ARCH="amd64"     # or: arm64
 
@@ -210,7 +210,7 @@ skillgraph-mcp --config mcp.json --transport http --port 8080
 ```json
 {
   "mcpServers": {
-    "skillful": {
+    "skillgraph": {
       "command": "/path/to/skillgraph-mcp",
       "args": ["--config", "/path/to/mcp.json"]
     }
@@ -225,7 +225,7 @@ skillgraph-mcp --config mcp.json --transport http --port 8080
 ```json
 {
   "mcpServers": {
-    "skillful": {
+    "skillgraph": {
       "command": "/path/to/skillgraph-mcp",
       "args": ["--config", "/path/to/mcp.json"]
     }
@@ -238,7 +238,7 @@ skillgraph-mcp --config mcp.json --transport http --port 8080
 <summary><strong>Codex CLI</strong> (<code>~/.codex/config.toml</code>)</summary>
 
 ```toml
-[mcp_servers.skillful]
+[mcp_servers.skillgraph]
 command = "/path/to/skillgraph-mcp"
 args = ["--config", "/path/to/mcp.json"]
 ```
@@ -379,13 +379,14 @@ Connects via Server-Sent Events.
 
 ### Flags
 
-| Flag            | Default      | Description                           |
-|-----------------|--------------|---------------------------------------|
-| `--config`      | `./mcp.json` | Path to the config file               |
-| `--transport`   | `stdio`      | Upstream transport: `stdio` or `http` |
-| `--host`        | `localhost`  | HTTP listen host                      |
-| `--port`        | `8080`       | HTTP listen port                      |
-| `--version`     |              | Print version and exit                |
+| Flag              | Default          | Description                           |
+|-------------------|------------------|---------------------------------------|
+| `--config`        | `./mcp.json`     | Path to the config file               |
+| `--lattice-dir`   | `./.mcp_lattice` | Directory for traces, READMEs, and lattice docs |
+| `--transport`     | `stdio`          | Upstream transport: `stdio` or `http` |
+| `--host`          | `localhost`      | HTTP listen host                      |
+| `--port`          | `8080`           | HTTP listen port                      |
+| `--version`       |                  | Print version and exit                |
 
 ## ⚠️ Gotchas
 
@@ -399,7 +400,7 @@ Connects via Server-Sent Events.
 }
 ```
 
-**`.mcp_lattice/` is relative to CWD.** Traces, READMEs, and lattice files are written to `.mcp_lattice/` in the working directory where skillgraph-mcp is launched — not next to the config file. If you run it from different directories, traces accumulate in different places.
+**`.mcp_lattice/` is relative to CWD by default.** Traces, READMEs, and lattice files are written to `.mcp_lattice/` in the working directory where skillgraph-mcp is launched — not next to the config file. Use `--lattice-dir /absolute/path` to pin it to a fixed location.
 
 **`mcp.json` is mutated at runtime.** The `skillGraph` section (descriptions and relations) is auto-populated and updated by the background refinement loops. Keep a copy if you want to preserve a known-good baseline, or use git to track changes.
 

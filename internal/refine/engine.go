@@ -21,7 +21,7 @@ import (
 
 var (
 	deepseekEndpoint    = "https://api.deepseek.com/v1/chat/completions"
-	geminiEndpoint      = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent"
+	geminiEndpoint      = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent"
 	openaiCompatEndpoint = "https://api.openai.com/v1/chat/completions"
 )
 
@@ -299,7 +299,7 @@ func cleanMarkdownJSON(s string) string {
 
 func callDeepSeek(ctx context.Context, key, system, user string) (string, error) {
 	reqBody, err := json.Marshal(map[string]any{
-		"model": "deepseek-chat",
+		"model": "deepseek-v4-flash",
 		"messages": []map[string]string{
 			{"role": "system", "content": system},
 			{"role": "user", "content": user},
@@ -353,7 +353,7 @@ func callOpenAICompat(ctx context.Context, key, system, user string) (string, er
 	}
 	model := os.Getenv("LLM_MODEL")
 	if model == "" {
-		model = "gpt-4o"
+		model = "gpt-5.4-nano"
 	}
 
 	reqBody, err := json.Marshal(map[string]any{

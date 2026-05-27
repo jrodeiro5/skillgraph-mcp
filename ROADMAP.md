@@ -63,12 +63,12 @@ This document tracks the implementation plan for the skill graph model in the `s
 - [x] Allow empty key for local unauthenticated servers (Ollama): omit the `Authorization` header when the key is empty.
 - [x] Write `TestCallOpenAICompat`, `TestCallOpenAICompatNoKey`, and `TestGetAPIKeyLLMBaseURL`.
 
-## Phase 10: Dynamic Server Registration [Planned]
+## Phase 10: Dynamic Server Registration [Done]
 
-- [ ] Add a `register_server` gateway tool (or REST endpoint) that accepts a server config block and hot-registers it without restarting the process.
-- [ ] Wire live registration into `Manager` — connect to the new server, infer graph relations, and call `RebuildGraph`.
-- [ ] Persist the new server entry to `mcp.json` atomically so restarts are idempotent.
-- [ ] Write integration test: register a server at runtime, verify its tools appear in `list_skills` without a restart.
+- [x] Add a `register_server` gateway tool that accepts a server config block and hot-registers it without restarting the process.
+- [x] Wire live registration into `Manager` — connect to the new server, infer graph relations, and call `RebuildGraph`.
+- [x] Persist the new server entry to `mcp.json` atomically so restarts are idempotent.
+- [x] Write integration test: register a server at runtime, verify its tools appear in `list_skills` without a restart.
 
 ## Planned Improvements
 

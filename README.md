@@ -136,9 +136,9 @@ To enable the SkillOpt and bootstrap refinement loops, set one of these environm
 | Variable | Provider | Notes |
 |---|---|---|
 | `LLM_BASE_URL` | Any OpenAI-compatible API | LiteLLM proxy, Ollama, etc. Set `LLM_API_KEY` and `LLM_MODEL` alongside |
-| `OPENAI_API_KEY` | OpenAI | Uses `gpt-4o` by default; override with `LLM_MODEL` |
-| `DEEPSEEK_API_KEY` | DeepSeek | Uses `deepseek-chat` |
-| `GEMINI_API_KEY` | Google Gemini | Uses `gemini-1.5-pro` |
+| `OPENAI_API_KEY` | OpenAI | Uses `gpt-5.4-nano` by default; override with `LLM_MODEL` |
+| `DEEPSEEK_API_KEY` | DeepSeek | Uses `deepseek-v4-flash` |
+| `GEMINI_API_KEY` | Google Gemini | Uses `gemini-3.1-flash-lite` |
 
 `LLM_BASE_URL` takes priority. When set, `LLM_API_KEY` is optional (Ollama and other local servers don't require auth).
 

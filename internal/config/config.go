@@ -55,7 +55,7 @@ func Load(path string) (map[string]Server, *SkillGraphConfig, error) {
 			return nil, nil, fmt.Errorf("server %q: %w", name, err)
 		}
 
-		srv, err := unmarshalServer(expanded)
+		srv, err := UnmarshalServer(expanded)
 		if err != nil {
 			return nil, nil, fmt.Errorf("server %q: %w", name, err)
 		}
@@ -69,7 +69,8 @@ func Load(path string) (map[string]Server, *SkillGraphConfig, error) {
 	return servers, raw.SkillGraph, nil
 }
 
-func unmarshalServer(data []byte) (Server, error) {
+// UnmarshalServer parses a raw JSON server config block into a typed Server.
+func UnmarshalServer(data []byte) (Server, error) {
 	var probe struct {
 		Type string `json:"type"`
 	}

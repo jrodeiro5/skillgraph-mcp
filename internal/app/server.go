@@ -15,7 +15,8 @@ import (
 )
 
 // NewServer creates an MCP server with all tools registered.
-func NewServer(mgr *mcpserver.Manager, latticeDir string) *mcp.Server {
+// configPath is the path to mcp.json used for persisting dynamic server registrations.
+func NewServer(mgr *mcpserver.Manager, latticeDir, configPath string) *mcp.Server {
 	s := mcp.NewServer(&mcp.Implementation{
 		Name:    "skillgraph-mcp",
 		Version: version.Version,
@@ -28,6 +29,7 @@ func NewServer(mgr *mcpserver.Manager, latticeDir string) *mcp.Server {
 	tools.RegisterGetSkillGraph(s, mgr)
 	tools.RegisterPlanWorkflow(s, mgr)
 	tools.RegisterReadLattice(s, mgr, latticeDir)
+	tools.RegisterRegisterServer(s, mgr, configPath)
 
 	return s
 }

@@ -272,6 +272,50 @@ func (m *Manager) ServerTools(name string) []Tool {
 	return tools
 }
 
+// AddServer connects to a new downstream MCP server and hot-registers it into
+// the manager without a restart. The graph is rebuilt atomically after the
+// connection succeeds. Returns an error if the name is already registered.
+func (m *Manager) AddServer(ctx context.Context, name string, cfg config.Server) error {
+	s, err := NewServer(ctx, cfg)
+	if err != nil {
+		return fmt.Errorf("connecting to %q: %w", name, err)
+	}
+
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	if _, exists := m.servers[name]; exists {
+		_ = s.Close()
+		return fmt.Errorf("server %q is already registered", name)
+	}
+
+	m.servers[name] = s
+	slog.Info("hot-registered server", "server", name)
+
+	// Re-resolve all tools — name conflicts across all servers must stay consistent.
+	tools, err := resolveTools(m.servers)
+	if err != nil {
+		delete(m.servers, name)
+		_ = s.Close()
+		return fmt.Errorf("resolving tools after adding %q: %w", name, err)
+	}
+	m.tools = tools
+
+	// Rebuild the graph from scratch so inferred relations are correct.
+	g := graph.New()
+	for sName, srv := range m.servers {
+		g.AddNode(sName, graph.NodeSkill, sName, srv.Instructions())
+	}
+	for _, t := range m.tools {
+		g.AddNode(t.ResolvedName, graph.NodeTool, t.ResolvedName, t.Description)
+		g.AddEdge(t.ServerName, t.ResolvedName, graph.RelHasTool, "")
+	}
+	m.inferRelations(g)
+	m.graph = g
+
+	return nil
+}
+
 func (m *Manager) Close() {
 	for name, s := range m.servers {
 		if err := s.Close(); err != nil {

@@ -88,7 +88,7 @@ func Execute() {
 	// Trigger asynchronous LLM metadata refinement for new/undescribed servers
 	refine.StartRefinementLoop(ctx, opts.configPath, mgr, opts.latticeDir, servers)
 
-	s := app.NewServer(mgr, opts.latticeDir)
+	s := app.NewServer(mgr, opts.latticeDir, opts.configPath)
 	var serveErr error
 	switch opts.transport {
 	case "stdio":

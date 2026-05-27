@@ -20,6 +20,9 @@ Too many MCP tools slowing your agent down? Might be a Skill Issue 😉
 - [How it works](#-how-it-works)
 - [Getting started](#-getting-started)
 - [Configuration](#-configuration)
+- [Embedding in Go](#-embedding-in-go)
+- [Gotchas](#️-gotchas)
+- [Troubleshooting](#-troubleshooting)
 
 ## ❓ Why?
 
@@ -377,6 +380,53 @@ Connects via Server-Sent Events.
 | `url`     | yes      | SSE endpoint URL |
 | `headers` | no       | HTTP headers     |
 
+### Skill graph (manual overrides)
+
+The optional `skillGraph` section in `mcp.json` lets you manually define descriptions and relationships that the agent uses for routing and planning. The LLM refinement loops also write here — you can seed it by hand or let it auto-populate.
+
+```json
+{
+  "mcpServers": { "...": {} },
+  "skillGraph": {
+    "descriptions": {
+      "github-issues": "GitHub issue management — create, search, update, and triage issues.",
+      "github_create_issue": "Opens a new issue. Requires a repository name and title."
+    },
+    "relations": [
+      {
+        "source": "github_search_issues",
+        "target": "github_create_issue",
+        "type": "COMMON_NEXT_STEP",
+        "description": "After searching, you may want to open a related issue"
+      },
+      {
+        "source": "github_create_issue",
+        "target": "github_add_label",
+        "type": "PREREQUISITE_FOR",
+        "description": "Label the issue after creating it"
+      }
+    ]
+  }
+}
+```
+
+**Descriptions** override the tool/server text shown by `list_skills`, `use_skill`, and `plan_workflow`. Both server names and individual tool names are valid keys.
+
+**Relations** define typed edges in the capability graph. Valid `type` values:
+
+| Type | Meaning |
+|---|---|
+| `PREREQUISITE_FOR` | source must run before target |
+| `PRODUCES` | source output is consumed by target |
+| `REQUIRES` | source needs target's output as input |
+| `COMMON_NEXT_STEP` | target is commonly called after source |
+
+#### Automatic relation inference
+
+skillgraph-mcp also infers `PREREQUISITE_FOR` edges automatically at startup. If a tool has a parameter ending in `_id` or `_number`, it looks for other tools whose names contain `create_<prefix>`, `get_<prefix>`, or `search_<prefix>` and adds a prerequisite edge from them. For example, `comment_on_issue(issue_number: int)` will automatically get a `PREREQUISITE_FOR` edge from `create_issue` and `search_issues` — no config needed.
+
+Manual `relations` entries are merged on top of inferred ones.
+
 ### Flags
 
 | Flag              | Default          | Description                           |
@@ -387,6 +437,48 @@ Connects via Server-Sent Events.
 | `--host`          | `localhost`      | HTTP listen host                      |
 | `--port`          | `8080`           | HTTP listen port                      |
 | `--version`       |                  | Print version and exit                |
+
+## 🔌 Embedding in Go
+
+skillgraph-mcp can be used as a library inside a Go program without running the CLI binary. Import the internal packages directly:
+
+```go
+import (
+    "github.com/jrodeiro5/skillgraph-mcp/internal/config"
+    "github.com/jrodeiro5/skillgraph-mcp/internal/mcpserver"
+    "github.com/modelcontextprotocol/go-sdk/mcp"
+)
+
+// Load config and connect to downstream servers
+servers, graphCfg, err := config.Load("mcp.json")
+mgr, err := mcpserver.NewManager(ctx, servers, graphCfg)
+defer mgr.Close()
+
+// Inspect the graph
+graph := mgr.GetGraph()
+tools := mgr.AllTools()               // all resolved tools across all skills
+dbTools := mgr.ServerTools("postgres") // tools from one skill
+
+// Proxy a tool call directly
+srv, _ := mgr.GetServer("postgres")
+result, _ := srv.CallTool(ctx, &mcp.CallToolParams{
+    Name:      "query",
+    Arguments: map[string]any{"sql": "SELECT 1"},
+})
+
+// Rebuild graph after a config change
+mgr.RebuildGraph(updatedGraphCfg)
+```
+
+If you already have an `*mcp.ClientSession` (e.g. from your own transport), wrap it without going through the config file:
+
+```go
+srv, err := mcpserver.NewServerFromSession(ctx, session, config.ServerOptions{
+    Description:  "My custom skill",
+    AllowedTools: []string{"search", "create"},
+})
+mgr, err := mcpserver.NewManagerFromServers(map[string]*mcpserver.Server{"my-skill": srv})
+```
 
 ## ⚠️ Gotchas
 

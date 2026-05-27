@@ -35,6 +35,8 @@ skillgraph-mcp fixes this through **progressive disclosure**. The agent sees 7
 lightweight gateway tools and discovers specific downstream schemas on-demand,
 collapsing thousands of tokens down to a lightweight index.
 
+> **Not an infrastructure gateway.** Projects like [Microsoft MCP Gateway](https://github.com/microsoft/mcp-gateway) and [IBM AI Gateway MCP](https://www.ibm.com/docs/en/api-connect) solve the ops problem — Kubernetes deployment, RBAC, adapter lifecycle. skillgraph-mcp solves the agent cognition problem: which tools exist, how they relate, and how to get better at routing them over time. They are complementary, not competing.
+
 [tool-bloat]: https://kvg.dev/posts/20260125-skills-and-mcp/
 
 ## 💡 How it works

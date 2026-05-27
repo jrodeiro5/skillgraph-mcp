@@ -1,6 +1,12 @@
 {
   "version": 1,
   "skills": {
+    "architecture": {
+      "source": "markdown-viewer/skills",
+      "sourceType": "github",
+      "skillPath": "architecture/SKILL.md",
+      "computedHash": "add5f37477735ade3275336c8959d5b4ae788dbcdb71582a38770b89c147c2d1"
+    },
     "golang-patterns": {
       "source": "affaan-m/everything-claude-code",
       "sourceType": "autoskills-registry",
@@ -10,6 +16,18 @@
       "source": "affaan-m/everything-claude-code",
       "sourceType": "autoskills-registry",
       "computedHash": "4c1e0c6805760534d8fd1a9fa2e4b5eb700b402f054254383437bd679d341cbd"
+    },
+    "mindmap": {
+      "source": "markdown-viewer/skills",
+      "sourceType": "github",
+      "skillPath": "mindmap/SKILL.md",
+      "computedHash": "3ad155148d53060ebe878d11feae61ec496ce0fc4bd738991eb37269cc43fda8"
+    },
+    "uml": {
+      "source": "markdown-viewer/skills",
+      "sourceType": "github",
+      "skillPath": "uml/SKILL.md",
+      "computedHash": "9f11e9e19eaad8d56ec914450fc945f652abcf6de944135fb195d2f5eae212d7"
     }
   }
 }

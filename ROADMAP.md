@@ -74,4 +74,4 @@ This document tracks the implementation plan for the skill graph model in the `s
 
 - [x] **Hold-out validation gate**: accept SkillOpt edits only if they do not regress a reference trace set (aligned with arXiv:2605.23904, which uses a held-out validation set).
 - [x] **Edit history with rollback**: save a change history for `mcp.json` to allow automatic revert if routing quality degrades.
-- [ ] **Graph topology ablation**: compare typed relations (`PRODUCES`, `REQUIRES`) against a flat graph to measure actual added value.
+- [x] **Graph topology ablation**: compare typed relations (`PRODUCES`, `REQUIRES`) against a flat graph to measure actual added value. Methodology, task suite design, instrumentation guide, and statistical validity requirements documented in `BENCHMARKS.md`.

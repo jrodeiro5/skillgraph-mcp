@@ -1,71 +1,70 @@
-# ROADMAP: Integración de Grafo de Capacidades en `skillgraph-mcp`
+# ROADMAP: Skill Graph Integration in `skillgraph-mcp`
 
-Este documento detalla las tareas pendientes para implementar un modelo de grafo de capacidades en el fork `skillgraph-mcp` y mejorar el descubrimiento dinámico de herramientas y la orquestación.
+This document tracks the implementation plan for the skill graph model in the `skillgraph-mcp` fork, improving dynamic tool discovery and orchestration.
 
-## Fase 1: Estructura de Datos del Grafo (Go) [Completado]
-- [x] Crear el paquete `internal/graph`.
-- [x] Definir los tipos de nodo: `Skill`, `Tool`, `Resource`.
-- [x] Definir los tipos de relación: `HAS_TOOL`, `PREREQUISITE_FOR`, `PRODUCES`, `REQUIRES`, `COMMON_NEXT_STEP`.
-- [x] Implementar la estructura en memoria `Graph` (CRUD de nodos y aristas).
-- [x] Implementar un serializador compacto para LLMs (ej: formato Markdown / Lattice de relaciones).
-- [x] Escribir pruebas unitarias en `internal/graph/graph_test.go`.
+## Phase 1: Graph Data Structures (Go) [Done]
+- [x] Create the `internal/graph` package.
+- [x] Define node types: `Skill`, `Tool`, `Resource`.
+- [x] Define relation types: `HAS_TOOL`, `PREREQUISITE_FOR`, `PRODUCES`, `REQUIRES`, `COMMON_NEXT_STEP`.
+- [x] Implement in-memory `Graph` structure (node and edge CRUD).
+- [x] Implement a compact serializer for LLMs (Markdown / relation lattice format).
+- [x] Write unit tests in `internal/graph/graph_test.go`.
 
-## Fase 2: Inferencia de Relaciones y Configuración [Completado]
-- [x] Extender la configuración en `internal/config/config.go` para permitir relaciones estáticas definidas por el usuario.
-- [x] Integrar el grafo en `internal/mcpserver/manager.go`.
-- [x] Diseñar el motor de inferencia semántica automática durante la carga:
-  - Vincular automáticamente `Skill -[HAS_TOOL]-> Tool`.
-  - Inferir relaciones `PRODUCES`/`REQUIRES` analizando y cruzando los schemas JSON de entrada y salida (coincidencia de tipos y nombres como `xxx_id`).
-  - Agrupar herramientas que operen sobre entidades comunes por prefijo (ej: `github_create_issue` y `github_update_issue`).
+## Phase 2: Relation Inference and Configuration [Done]
+- [x] Extend configuration in `internal/config/config.go` to allow user-defined static relations.
+- [x] Integrate the graph into `internal/mcpserver/manager.go`.
+- [x] Design automatic semantic inference engine at load time:
+  - Auto-link `Skill -[HAS_TOOL]-> Tool`.
+  - Infer `PRODUCES`/`REQUIRES` relations by cross-matching JSON input/output schemas (type and name matching, e.g. `xxx_id` suffix).
+  - Group tools operating on the same entity by prefix (e.g. `github_create_issue` and `github_update_issue`).
 
-## Fase 3: Nuevas Herramientas MCP para el Agente [Completado]
-- [x] Implementar la herramienta `get_skill_graph`:
-  - Permitir consultar el grafo completo o filtrado por una skill específica.
-- [x] Implementar la herramienta `plan_workflow`:
-  - Recibir un string descriptivo (meta de alto nivel) y devolver un camino recomendado de ejecución de herramientas.
-- [x] Registrar estas herramientas en el servidor principal (`internal/app/server.go`).
-- [x] Escribir pruebas e2e y de integración para las nuevas herramientas.
+## Phase 3: New MCP Tools for the Agent [Done]
+- [x] Implement `get_skill_graph` tool:
+  - Query the full graph or filter by a specific skill.
+- [x] Implement `plan_workflow` tool:
+  - Accept a descriptive string (high-level goal) and return a recommended tool execution path.
+- [x] Register these tools in the main server (`internal/app/server.go`).
+- [x] Write e2e and integration tests for the new tools.
 
-## Fase 4: Autogeneración Offline de Metadatos (Bootstrap) [Completado]
-- [x] Crear un comando o script offline (`cmd/bootstrap_metadata` / CLI flag) que analice los servidores MCP configurados.
-- [x] Usar un modelo/API para generar descripciones claras y orientadas a casos de uso de cada herramienta y skill (automatización similar a Adala).
-- [x] Escribir estas descripciones actualizadas en la configuración para optimizar el enrutamiento inicial.
+## Phase 4: Offline Metadata Bootstrap [Done]
+- [x] Create an offline command or script (`cmd/bootstrap_metadata` / CLI flag) that analyzes configured MCP servers.
+- [x] Use a model/API to generate clear, use-case-oriented descriptions for each tool and skill (Adala-style automation).
+- [x] Write these updated descriptions back to config to optimize initial routing.
 
-## Fase 5: Lattice Semántico en Markdown [Completado]
-- [x] Crear la carpeta `.mcp_lattice`
-- [x] Agregar un generador en Go para crear `skills.md` y `relations.md`
-- [x] Exponer la herramienta `read_lattice` (`internal/tools/read_lattice.go`)
+## Phase 5: Semantic Lattice in Markdown [Done]
+- [x] Create the `.mcp_lattice` folder.
+- [x] Add a Go generator to produce `skills.md` and `relations.md`.
+- [x] Expose the `read_lattice` tool (`internal/tools/read_lattice.go`).
 
-## Fase 6: Descargador de Documentación Nativo (go-github) [Completado]
-- [x] Agregar `github.com/google/go-github/v60` a `go.mod`
-- [x] Implementar el descargador de READMEs en `internal/docs/fetcher.go`
-- [x] Vincular la descarga de documentación en el inicio de los skills
-- [x] Verificar el correcto funcionamiento de la descarga y tests
+## Phase 6: Native Documentation Downloader (go-github) [Done]
+- [x] Add `github.com/google/go-github/v60` to `go.mod`.
+- [x] Implement the README downloader in `internal/docs/fetcher.go`.
+- [x] Wire documentation download into skill startup.
+- [x] Verify download behavior and tests.
 
-## Fase 7: Optimización Dinámica de Habilidades (SkillOpt) [Completado]
-- [x] Implementar logging de trayectorias (rollouts) en `execute_code.go` usando `TraceCollector` context-based.
-- [x] Guardar trazas como JSON en `.mcp_lattice/traces/`.
-- [x] Crear un demonio en segundo plano (`startOptimizationLoop` en `refine/engine.go`) que analice trazas acumuladas periódicamente.
-- [x] Implementar bucle de optimización de texto (SkillOpt) con prompts para DeepSeek/Gemini que sugieran modificaciones y relaciones en `mcp.json`.
-- [x] Validar que las propuestas no contengan nodos alucinados antes de persistir los cambios en la configuración.
-- [x] Escribir pruebas unitarias correspondientes en `execute_code_test.go` y `engine_test.go` para verificar el correcto funcionamiento.
+## Phase 7: Dynamic Skill Optimization (SkillOpt) [Done]
+- [x] Implement trajectory logging (rollouts) in `execute_code.go` using context-based `TraceCollector`.
+- [x] Save traces as JSON in `.mcp_lattice/traces/`.
+- [x] Create a background daemon (`startOptimizationLoop` in `refine/engine.go`) that analyzes accumulated traces periodically.
+- [x] Implement text optimization loop (SkillOpt) with prompts for DeepSeek/Gemini that suggest description and relation edits in `mcp.json`.
+- [x] Validate that proposals contain no hallucinated nodes before persisting changes to config.
+- [x] Write corresponding unit tests in `execute_code_test.go` and `engine_test.go`.
 
-## Fase 8: Puerta de Validación SkillOpt [Completado]
-- [x] Añadir salida anticipada en `optimizeTraces`: omitir la llamada al LLM cuando el lote no contiene ningún error (ni `traj.Error` ni `is_error: true` en llamadas a herramientas).
-- [x] Eliminar archivos de traza procesados incluso cuando se salta el LLM, para evitar acumulación infinita.
-- [x] Escribir `TestOptimizeTracesSkipsLLMWhenNoErrors` para verificar el comportamiento.
+## Phase 8: SkillOpt Validation Gate [Done]
+- [x] Add early exit in `optimizeTraces`: skip the LLM call when the batch contains no errors (neither `traj.Error` nor `is_error: true` in tool calls).
+- [x] Delete processed trace files even when the LLM is skipped, to prevent unbounded accumulation.
+- [x] Write `TestOptimizeTracesSkipsLLMWhenNoErrors` to verify the behavior.
 
-## Fase 9: Soporte Multi-proveedor LLM [Completado]
-- [x] Añadir `callOpenAICompat` en `refine/engine.go` — compatible con LiteLLM proxy, Ollama, OpenAI y cualquier API OpenAI-compatible.
-- [x] Actualizar `getAPIKey` para dar prioridad a `LLM_BASE_URL` / `LLM_API_KEY` / `LLM_MODEL` antes que a los proveedores específicos.
-- [x] Añadir soporte para `OPENAI_API_KEY` como proveedor de OpenAI nativo.
-- [x] Actualizar `refineServer` y `optimizeTraces` con un `switch` de proveedor que incluya el caso `"openai"`.
-- [x] Permitir clave vacía para servidores locales sin autenticación (Ollama): omitir la cabecera `Authorization` cuando la clave está vacía.
-- [x] Escribir `TestCallOpenAICompat`, `TestCallOpenAICompatNoKey` y `TestGetAPIKeyLLMBaseURL`.
+## Phase 9: Multi-Provider LLM Support [Done]
+- [x] Add `callOpenAICompat` in `refine/engine.go` — compatible with LiteLLM proxy, Ollama, OpenAI, and any OpenAI-compatible API.
+- [x] Update `getAPIKey` to prioritize `LLM_BASE_URL` / `LLM_API_KEY` / `LLM_MODEL` over provider-specific keys.
+- [x] Add support for `OPENAI_API_KEY` as a native OpenAI provider.
+- [x] Update `refineServer` and `optimizeTraces` with a provider `switch` that includes the `"openai"` case.
+- [x] Allow empty key for local unauthenticated servers (Ollama): omit the `Authorization` header when the key is empty.
+- [x] Write `TestCallOpenAICompat`, `TestCallOpenAICompatNoKey`, and `TestGetAPIKeyLLMBaseURL`.
 
-## Mejoras Planificadas
+## Planned Improvements
 
-- [ ] **Puerta de validación con hold-out**: aceptar edits de SkillOpt solo si no hacen regresar un conjunto de trazas de referencia (alineado con el paper arXiv:2605.23904 que usa validación en conjunto separado).
-- [ ] **Historial de ediciones con rollback**: guardar un historial de cambios en `mcp.json` para poder revertir automáticamente si la calidad del routing degrada.
-- [ ] **Ablación de topología del grafo**: comparar relaciones tipadas (`PRODUCES`, `REQUIRES`) contra un grafo plano para medir el valor añadido real.
-
+- [ ] **Hold-out validation gate**: accept SkillOpt edits only if they do not regress a reference trace set (aligned with arXiv:2605.23904, which uses a held-out validation set).
+- [ ] **Edit history with rollback**: save a change history for `mcp.json` to allow automatic revert if routing quality degrades.
+- [ ] **Graph topology ablation**: compare typed relations (`PRODUCES`, `REQUIRES`) against a flat graph to measure actual added value.

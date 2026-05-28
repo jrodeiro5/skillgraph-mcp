@@ -243,6 +243,8 @@ func resolveTools(servers map[string]*Server) ([]Tool, error) {
 }
 
 func (m *Manager) GetServer(name string) (*Server, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
 	s, ok := m.servers[name]
 	if !ok {
 		return nil, fmt.Errorf("unknown server: %q", name)
@@ -251,6 +253,8 @@ func (m *Manager) GetServer(name string) (*Server, error) {
 }
 
 func (m *Manager) ListServerNames() []string {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
 	names := make([]string, 0, len(m.servers))
 	for name := range m.servers {
 		names = append(names, name)
@@ -259,10 +263,16 @@ func (m *Manager) ListServerNames() []string {
 }
 
 func (m *Manager) AllTools() []Tool {
-	return m.tools
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	out := make([]Tool, len(m.tools))
+	copy(out, m.tools)
+	return out
 }
 
 func (m *Manager) ServerTools(name string) []Tool {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
 	var tools []Tool
 	for _, t := range m.tools {
 		if t.ServerName == name {

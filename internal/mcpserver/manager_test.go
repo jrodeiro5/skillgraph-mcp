@@ -1,8 +1,10 @@
 package mcpserver
 
 import (
+	"sync"
 	"testing"
 
+	"github.com/jrodeiro5/skillgraph-mcp/internal/graph"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
@@ -333,4 +335,62 @@ func TestManagerGraph(t *testing.T) {
 	if !hasInferred {
 		t.Error("missing inferred relation 'create_issue -PREREQUISITE_FOR-> comment_on_issue'")
 	}
+}
+
+// TestAllToolsConcurrentAccess hammers AllTools/ServerTools/ListServerNames
+// while a writer mutates manager state under the write lock. Run with -race;
+// any missing lock in a reader will be flagged.
+func TestAllToolsConcurrentAccess(t *testing.T) {
+	t.Parallel()
+
+	m := &Manager{
+		servers: map[string]*Server{},
+		tools:   []Tool{{ServerName: "alpha", ResolvedName: "tool_a"}},
+		graph:   graph.New(),
+	}
+
+	var wg sync.WaitGroup
+	stop := make(chan struct{})
+
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		for {
+			select {
+			case <-stop:
+				return
+			default:
+			}
+			m.mu.Lock()
+			m.tools = []Tool{
+				{ServerName: "alpha", ResolvedName: "tool_a"},
+				{ServerName: "beta", ResolvedName: "tool_b"},
+			}
+			m.servers["beta"] = nil
+			m.mu.Unlock()
+		}
+	}()
+
+	for i := 0; i < 4; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for j := 0; j < 2000; j++ {
+				_ = m.AllTools()
+				_ = m.ServerTools("alpha")
+				_ = m.ListServerNames()
+			}
+		}()
+	}
+
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		for j := 0; j < 2000; j++ {
+			_ = m.AllTools()
+		}
+		close(stop)
+	}()
+
+	wg.Wait()
 }

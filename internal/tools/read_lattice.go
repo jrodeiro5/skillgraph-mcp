@@ -42,8 +42,10 @@ func newReadLattice(mgr *mcpserver.Manager, latticeDir string) func(context.Cont
 			return result, nil, nil
 		}
 
-		// Security check: Prevent path traversal outside the lattice folder
-		if !strings.HasPrefix(targetPath, absLatticeDir) {
+		// Security check: Prevent path traversal outside the lattice folder.
+		// Compare with trailing separator to avoid matching sibling directories
+		// that share the same prefix (e.g. /tmp/lattice vs /tmp/lattice_evil).
+		if targetPath != absLatticeDir && !strings.HasPrefix(targetPath, absLatticeDir+string(os.PathSeparator)) {
 			result := &mcp.CallToolResult{}
 			result.SetError(fmt.Errorf("access denied: path traversal detected"))
 			return result, nil, nil

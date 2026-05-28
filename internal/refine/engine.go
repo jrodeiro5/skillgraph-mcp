@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"math/rand/v2"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -44,7 +45,12 @@ func StartRefinementLoop(ctx context.Context, configPath string, mgr *mcpserver.
 		return
 	}
 
-	// 1. Initial document-based README refinement (Bootstrap phase)
+	// 1. Initial document-based README refinement (Bootstrap phase).
+	// Cap concurrent LLM calls and jitter the start of each goroutine so we
+	// don't blast the upstream provider with N simultaneous requests, which
+	// blows past free-tier rate limits even when total volume is small.
+	const bootstrapConcurrency = 3
+	sem := make(chan struct{}, bootstrapConcurrency)
 	for name := range servers {
 		// Check if we already have descriptions or relations defined for this server
 		hasDescriptions := false
@@ -59,8 +65,17 @@ func StartRefinementLoop(ctx context.Context, configPath string, mgr *mcpserver.
 			continue
 		}
 
-		// Run refinement in a separate goroutine per server
 		go func(serverName string) {
+			// Stagger startup so concurrent goroutines don't all hit the
+			// semaphore at the same instant.
+			time.Sleep(time.Duration(rand.IntN(500)) * time.Millisecond)
+			select {
+			case sem <- struct{}{}:
+			case <-ctx.Done():
+				return
+			}
+			defer func() { <-sem }()
+
 			if err := refineServer(ctx, provider, key, configPath, mgr, latticeDir, serverName, servers); err != nil {
 				slog.Error("RefinementEngine: bootstrap refinement failed", "server", serverName, "error", err)
 			}
@@ -178,19 +193,8 @@ Guidelines:
 	}
 	userPrompt := fmt.Sprintf("MCP Server Name: %s\n\nREADME Documentation:\n%s\n\nTools List:\n%s", serverName, readmeSection, toolsBuilder.String())
 
-	// 3. Request LLM
-	var (
-		refinedJSON string
-		err         error
-	)
-	switch provider {
-	case "openai":
-		refinedJSON, err = callOpenAICompat(ctx, key, systemPrompt, userPrompt)
-	case "deepseek":
-		refinedJSON, err = callDeepSeek(ctx, key, systemPrompt, userPrompt)
-	default:
-		refinedJSON, err = callGemini(ctx, key, systemPrompt, userPrompt)
-	}
+	// 3. Request LLM (with retry on transient errors)
+	refinedJSON, err := callLLM(ctx, provider, key, systemPrompt, userPrompt)
 	if err != nil {
 		return fmt.Errorf("calling LLM API: %w", err)
 	}
@@ -338,7 +342,7 @@ func callDeepSeek(ctx context.Context, key, system, user string) (string, error)
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
-		return "", fmt.Errorf("DeepSeek API returned HTTP %d: %s", resp.StatusCode, string(body))
+		return "", &HTTPStatusError{Status: resp.StatusCode, Body: "DeepSeek: " + string(body)}
 	}
 
 	var data struct {
@@ -398,7 +402,7 @@ func callOpenAICompat(ctx context.Context, key, system, user string) (string, er
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
-		return "", fmt.Errorf("OpenAI-compat API returned HTTP %d: %s", resp.StatusCode, string(body))
+		return "", &HTTPStatusError{Status: resp.StatusCode, Body: "OpenAI-compat: " + string(body)}
 	}
 
 	var data struct {
@@ -450,7 +454,7 @@ func callGemini(ctx context.Context, key, system, user string) (string, error) {
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
-		return "", fmt.Errorf("Gemini API returned HTTP %d: %s", resp.StatusCode, string(body))
+		return "", &HTTPStatusError{Status: resp.StatusCode, Body: "Gemini: " + string(body)}
 	}
 
 	var data struct {
@@ -828,16 +832,7 @@ Guidelines:
 
 	userPrompt := fmt.Sprintf("Current Graph:\n%s\n\nTools:\n%s\n\nRecent Trajectories:\n%s", currentGraphStr, toolsBuilder.String(), tracesBuilder.String())
 
-	var refinedJSON string
-	var err error
-	switch provider {
-	case "openai":
-		refinedJSON, err = callOpenAICompat(ctx, key, systemPrompt, userPrompt)
-	case "deepseek":
-		refinedJSON, err = callDeepSeek(ctx, key, systemPrompt, userPrompt)
-	default:
-		refinedJSON, err = callGemini(ctx, key, systemPrompt, userPrompt)
-	}
+	refinedJSON, err := callLLM(ctx, provider, key, systemPrompt, userPrompt)
 	if err != nil {
 		return false, fmt.Errorf("calling LLM API: %w", err)
 	}

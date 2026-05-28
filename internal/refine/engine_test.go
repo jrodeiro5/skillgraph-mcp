@@ -660,13 +660,13 @@ func TestOptimizeTracesExecution(t *testing.T) {
 
 func TestSplitHoldout(t *testing.T) {
 	tests := []struct {
-		files    []string
-		wantHO   int
-		wantOpt  int
+		files   []string
+		wantHO  int
+		wantOpt int
 	}{
-		{[]string{"a", "b", "c"}, 0, 3},         // < 4 → no hold-out
-		{[]string{"a", "b", "c", "d"}, 1, 3},    // 4 files → 1 hold-out
-		{[]string{"a", "b", "c", "d", "e", "f"}, 2, 4}, // 6 files → 2 hold-out
+		{[]string{"a", "b", "c"}, 0, 3},                               // < 4 → no hold-out
+		{[]string{"a", "b", "c", "d"}, 1, 3},                          // 4 files → 1 hold-out
+		{[]string{"a", "b", "c", "d", "e", "f"}, 2, 4},                // 6 files → 2 hold-out
 		{[]string{"a", "b", "c", "d", "e", "f", "g", "h", "i"}, 3, 6}, // 9 → 3 hold-out
 	}
 	for _, tt := range tests {

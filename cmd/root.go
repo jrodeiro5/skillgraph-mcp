@@ -1,106 +1,65 @@
 package cmd
 
 import (
-	"context"
 	"fmt"
-	"log/slog"
 	"os"
-	"os/signal"
-	"syscall"
 
-	"github.com/jrodeiro5/skillgraph-mcp/internal/app"
-	"github.com/jrodeiro5/skillgraph-mcp/internal/config"
-	"github.com/jrodeiro5/skillgraph-mcp/internal/docs"
-	"github.com/jrodeiro5/skillgraph-mcp/internal/mcpserver"
-	"github.com/jrodeiro5/skillgraph-mcp/internal/refine"
 	"github.com/jrodeiro5/skillgraph-mcp/internal/version"
-
-	flag "github.com/spf13/pflag"
 )
 
-type options struct {
-	configPath string
-	latticeDir string
-	transport  string
-	host       string
-	port       string
-	version    bool
-}
+const usage = `skillgraph-mcp — MCP gateway with semantic skill graph.
 
-func parseFlags(args []string) options {
-	var opts options
-	fs := flag.NewFlagSet("skillgraph-mcp", flag.ExitOnError)
-	fs.StringVar(&opts.configPath, "config", "./mcp.json", "Path to MCP config file")
-	fs.StringVar(&opts.latticeDir, "lattice-dir", "./.mcp_lattice", "Directory for traces, READMEs, and lattice docs")
-	fs.StringVar(&opts.transport, "transport", "stdio", "Upstream transport: stdio or http")
-	fs.StringVar(&opts.host, "host", "localhost", "HTTP host (when transport=http)")
-	fs.StringVar(&opts.port, "port", "8080", "HTTP port (when transport=http)")
-	fs.BoolVar(&opts.version, "version", false, "Print version and exit")
-	if err := fs.Parse(args); err != nil {
-		os.Exit(1)
-	}
-	return opts
-}
+Usage:
+  skillgraph-mcp [serve]              Run the gateway (default).
+  skillgraph-mcp list-skills          List configured skills and their tools.
+  skillgraph-mcp validate             Connect to every downstream server and report failures.
+  skillgraph-mcp doctor               Diagnose the local environment.
+  skillgraph-mcp --version            Print version and exit.
+  skillgraph-mcp --help               Show this help.
 
+Run "skillgraph-mcp <command> --help" for command-specific flags.
+`
+
+// Execute is the CLI entry point. It dispatches on the first non-flag argument
+// (the subcommand); when none is given, "serve" is used so existing invocations
+// remain backwards-compatible.
 func Execute() {
-	opts := parseFlags(os.Args[1:])
+	args := os.Args[1:]
 
-	if opts.version {
-		fmt.Println(version.Version)
-		return
-	}
-
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-	defer stop()
-
-	servers, graphCfg, err := config.Load(opts.configPath)
-	if err != nil {
-		slog.Error("failed to load config", "error", err)
-		os.Exit(1)
-	}
-
-	slog.Info("loaded config", "servers", len(servers))
-	for name, srv := range servers {
-		switch s := srv.(type) {
-		case *config.StdioServer:
-			slog.Info("configured server", "name", name, "transport", "stdio", "command", s.Command, "args", s.Args)
-		case *config.HTTPServer:
-			slog.Info("configured server", "name", name, "transport", "http", "url", s.URL)
-		case *config.SSEServer:
-			slog.Info("configured server", "name", name, "transport", "sse", "url", s.URL)
+	// Top-level flags handled before subcommand dispatch.
+	if len(args) > 0 {
+		switch args[0] {
+		case "--version", "-v":
+			fmt.Println(version.Version)
+			return
+		case "--help", "-h", "help":
+			fmt.Print(usage)
+			return
 		}
 	}
 
-	mgr, err := mcpserver.NewManager(ctx, servers, graphCfg)
-	if err != nil {
-		slog.Error("failed to connect to servers", "error", err)
-		os.Exit(1)
-	}
-	defer mgr.Close()
-
-	slog.Info("connected to servers", "servers", mgr.ListServerNames())
-
-	// Generate the semantic markdown documentation lattice
-	if err := docs.GenerateLattice(ctx, opts.latticeDir, servers, mgr.GetGraph()); err != nil {
-		slog.Warn("failed to generate semantic lattice", "error", err)
+	subcommand := "serve"
+	rest := args
+	if len(args) > 0 && !isFlag(args[0]) {
+		subcommand = args[0]
+		rest = args[1:]
 	}
 
-	// Trigger asynchronous LLM metadata refinement for new/undescribed servers
-	refine.StartRefinementLoop(ctx, opts.configPath, mgr, opts.latticeDir, servers)
-
-	s := app.NewServer(mgr, opts.latticeDir, opts.configPath)
-	var serveErr error
-	switch opts.transport {
-	case "stdio":
-		serveErr = app.ServeStdio(ctx, s)
-	case "http":
-		serveErr = app.ServeHTTP(ctx, s, opts.host, opts.port)
+	switch subcommand {
+	case "serve":
+		runServe(rest)
+	case "list-skills":
+		runListSkills(rest)
+	case "validate":
+		runValidate(rest)
+	case "doctor":
+		runDoctor(rest)
 	default:
-		slog.Error("unknown transport (use 'stdio' or 'http')", "transport", opts.transport)
-		os.Exit(1)
+		fmt.Fprintf(os.Stderr, "unknown command %q\n\n%s", subcommand, usage)
+		os.Exit(2)
 	}
-	if serveErr != nil {
-		slog.Error("server error", "error", serveErr)
-		os.Exit(1)
-	}
+}
+
+func isFlag(s string) bool {
+	return len(s) > 0 && s[0] == '-'
 }

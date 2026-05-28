@@ -36,35 +36,49 @@ func GenerateLattice(ctx context.Context, dir string, cfgs map[string]config.Ser
 			skillsBuilder.WriteString("No description provided.\n\n")
 		}
 
-		// Attempt to fetch documentation offline in a background goroutine to prevent startup blocking
+		// Attempt to fetch documentation offline in a background goroutine to prevent startup blocking.
+		// On any outcome (success, failure, or "no source"), a sentinel is written so that the
+		// refine bootstrap loop can stop waiting; a missing file means "still fetching".
 		go func(name string, srv config.Server) {
 			readmePath := filepath.Join(dir, fmt.Sprintf("%s_readme.md", name))
+			sentinelPath := readmePath + ".noreadme"
 
 			// Check if we already have it to avoid spamming network
 			if _, err := os.Stat(readmePath); err == nil {
 				return
 			}
 
-			// Try to fetch GitHub or NPM readme
+			fetched := false
 			switch s := srv.(type) {
 			case *config.HTTPServer:
 				if strings.Contains(s.URL, "github.com") {
-					_ = FetchReadme(ctx, s.URL, readmePath)
+					if err := FetchReadme(ctx, s.URL, readmePath); err == nil {
+						fetched = true
+					} else {
+						slog.Debug("fetching README failed", "server", name, "error", err)
+					}
 				}
 			case *config.SSEServer:
 				if strings.Contains(s.URL, "github.com") {
-					_ = FetchReadme(ctx, s.URL, readmePath)
-				}
-			case *config.StdioServer:
-				if s.Command == "npx" {
-					for _, arg := range s.Args {
-						if arg != "-y" && !strings.HasPrefix(arg, "-") {
-							// Simple package detection (supports @scope/name or name)
-							_ = FetchNPMReadme(ctx, arg, readmePath)
-							break
-						}
+					if err := FetchReadme(ctx, s.URL, readmePath); err == nil {
+						fetched = true
+					} else {
+						slog.Debug("fetching README failed", "server", name, "error", err)
 					}
 				}
+			case *config.StdioServer:
+				if pkg := extractNPMPackage(s.Command, s.Args); pkg != "" {
+					if err := FetchNPMReadme(ctx, pkg, readmePath); err == nil {
+						fetched = true
+					} else {
+						slog.Debug("fetching NPM README failed", "server", name, "package", pkg, "error", err)
+					}
+				}
+			}
+
+			if !fetched {
+				// Write a tiny marker so refine knows there will never be a README.
+				_ = os.WriteFile(sentinelPath, []byte("no-readme-source"), 0644)
 			}
 		}(name, srv)
 	}
@@ -89,4 +103,32 @@ func GenerateLattice(ctx context.Context, dir string, cfgs map[string]config.Ser
 
 	slog.Info("generated semantic lattice documentation", "dir", dir)
 	return nil
+}
+
+// extractNPMPackage returns the NPM package name from a stdio server's
+// command + args, or "" if the server isn't running through npx.
+// Recognises plain "npx", absolute paths to npx, and wrapper scripts whose
+// basename starts with "npx" (e.g. "npx-mcp").
+func extractNPMPackage(command string, args []string) string {
+	base := filepath.Base(command)
+	if base != "npx" && !strings.HasPrefix(base, "npx") {
+		return ""
+	}
+	for _, arg := range args {
+		if arg == "-y" || arg == "--yes" || strings.HasPrefix(arg, "-") {
+			continue
+		}
+		// First positional argument is the package spec (e.g. "foo", "@scope/foo", "foo@latest").
+		pkg := arg
+		// Drop any "@version" suffix (but keep scoped names starting with "@").
+		if strings.HasPrefix(pkg, "@") {
+			if idx := strings.Index(pkg[1:], "@"); idx >= 0 {
+				pkg = pkg[:1+idx]
+			}
+		} else if idx := strings.Index(pkg, "@"); idx >= 0 {
+			pkg = pkg[:idx]
+		}
+		return pkg
+	}
+	return ""
 }

@@ -21,8 +21,8 @@ import (
 )
 
 var (
-	deepseekEndpoint    = "https://api.deepseek.com/v1/chat/completions"
-	geminiEndpoint      = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent"
+	deepseekEndpoint     = "https://api.deepseek.com/v1/chat/completions"
+	geminiEndpoint       = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent"
 	openaiCompatEndpoint = "https://api.openai.com/v1/chat/completions"
 )
 
@@ -90,26 +90,31 @@ func getAPIKey() (string, string) {
 
 func refineServer(ctx context.Context, provider, key, configPath string, mgr *mcpserver.Manager, latticeDir, serverName string, servers map[string]config.Server) error {
 	readmePath := filepath.Join(latticeDir, fmt.Sprintf("%s_readme.md", serverName))
+	sentinelPath := readmePath + ".noreadme"
 
-	// 1. Wait for README to be downloaded by docs.GenerateLattice (up to 15 seconds)
+	// 1. Wait for either the README to be downloaded or a "no readme available"
+	// sentinel from docs.GenerateLattice. Either way, we proceed with refinement —
+	// without a README the LLM uses only the tools list.
 	start := time.Now()
+	var readmeData []byte
 	for {
-		if _, err := os.Stat(readmePath); err == nil {
+		if data, err := os.ReadFile(readmePath); err == nil {
+			readmeData = data
+			break
+		}
+		if _, err := os.Stat(sentinelPath); err == nil {
+			slog.Info("RefinementEngine: no README source available, refining from tools only", "server", serverName)
 			break
 		}
 		if time.Since(start) > 15*time.Second {
-			return fmt.Errorf("timeout waiting for README file: %s", readmePath)
+			slog.Info("RefinementEngine: README fetch timed out, refining from tools only", "server", serverName)
+			break
 		}
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
-		case <-time.After(1 * time.Second):
+		case <-time.After(500 * time.Millisecond):
 		}
-	}
-
-	readmeData, err := os.ReadFile(readmePath)
-	if err != nil {
-		return fmt.Errorf("reading README file: %w", err)
 	}
 
 	// 2. Extract tools and signatures
@@ -167,10 +172,17 @@ Guidelines:
 3. Establish clear prerequisite steps (e.g. tool A produces an output required by tool B) or common next steps (e.g. after search, you common next step is read).
 `
 
-	userPrompt := fmt.Sprintf("MCP Server Name: %s\n\nREADME Documentation:\n%s\n\nTools List:\n%s", serverName, string(readmeData), toolsBuilder.String())
+	readmeSection := "(no README available — infer from tool names, parameters, and descriptions)"
+	if len(readmeData) > 0 {
+		readmeSection = string(readmeData)
+	}
+	userPrompt := fmt.Sprintf("MCP Server Name: %s\n\nREADME Documentation:\n%s\n\nTools List:\n%s", serverName, readmeSection, toolsBuilder.String())
 
 	// 3. Request LLM
-	var refinedJSON string
+	var (
+		refinedJSON string
+		err         error
+	)
 	switch provider {
 	case "openai":
 		refinedJSON, err = callOpenAICompat(ctx, key, systemPrompt, userPrompt)
@@ -831,9 +843,9 @@ Guidelines:
 	}
 
 	type SkillOptEdits struct {
-		Descriptions     map[string]string       `json:"descriptions"`
-		Relations        []config.StaticRelation `json:"relations"`
-		DeleteRelations  []config.StaticRelation `json:"delete_relations"`
+		Descriptions    map[string]string       `json:"descriptions"`
+		Relations       []config.StaticRelation `json:"relations"`
+		DeleteRelations []config.StaticRelation `json:"delete_relations"`
 	}
 
 	var edits SkillOptEdits
@@ -918,4 +930,3 @@ Guidelines:
 
 	return modified, nil
 }
-

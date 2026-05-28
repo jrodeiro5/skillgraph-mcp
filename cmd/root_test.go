@@ -6,7 +6,7 @@ import (
 
 func TestDefaultFlags(t *testing.T) {
 	t.Parallel()
-	opts := parseFlags([]string{})
+	opts := parseServeFlags([]string{})
 
 	if opts.configPath != "./mcp.json" {
 		t.Errorf("configPath = %q, want './mcp.json'", opts.configPath)
@@ -27,7 +27,7 @@ func TestDefaultFlags(t *testing.T) {
 
 func TestCustomFlags(t *testing.T) {
 	t.Parallel()
-	opts := parseFlags([]string{
+	opts := parseServeFlags([]string{
 		"--config", "/tmp/custom.json",
 		"--transport", "http",
 		"--host", "0.0.0.0",
@@ -50,7 +50,7 @@ func TestCustomFlags(t *testing.T) {
 
 func TestVersionFlag(t *testing.T) {
 	t.Parallel()
-	opts := parseFlags([]string{"--version"})
+	opts := parseServeFlags([]string{"--version"})
 
 	if !opts.version {
 		t.Error("version = false, want true")

@@ -60,6 +60,10 @@ func (s *Server) CallTool(ctx context.Context, params *mcp.CallToolParams) (*mcp
 	return s.session.CallTool(ctx, params)
 }
 
+func (s *Server) Tools() []*mcp.Tool {
+	return s.tools
+}
+
 func (s *Server) Resources() []*mcp.Resource {
 	return s.resources
 }

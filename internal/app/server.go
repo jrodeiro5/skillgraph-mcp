@@ -16,7 +16,10 @@ import (
 
 // NewServer creates an MCP server with all tools registered.
 // configPath is the path to mcp.json used for persisting dynamic server registrations.
-func NewServer(mgr *mcpserver.Manager, latticeDir, configPath string) *mcp.Server {
+// transport and host describe how the gateway itself is being served, so
+// register_server can gate registration when bound to a non-loopback HTTP
+// address (see ADR-0001).
+func NewServer(mgr *mcpserver.Manager, latticeDir, configPath, transport, host string) *mcp.Server {
 	s := mcp.NewServer(&mcp.Implementation{
 		Name:    "skillgraph-mcp",
 		Version: version.Version,
@@ -29,7 +32,7 @@ func NewServer(mgr *mcpserver.Manager, latticeDir, configPath string) *mcp.Serve
 	tools.RegisterGetSkillGraph(s, mgr)
 	tools.RegisterPlanWorkflow(s, mgr)
 	tools.RegisterReadLattice(s, mgr, latticeDir)
-	tools.RegisterRegisterServer(s, mgr, configPath)
+	tools.RegisterRegisterServer(s, mgr, configPath, tools.GatewayBinding{Transport: transport, Host: host})
 
 	return s
 }

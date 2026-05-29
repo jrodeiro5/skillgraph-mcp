@@ -34,3 +34,7 @@ deepseek_key*
 # Generated files
 .mcp_lattice/
 .gitnexus
+
+# act (nektos/act) local CI artifacts
+.act-cache/
+act-event.json

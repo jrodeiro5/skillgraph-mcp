@@ -564,3 +564,17 @@ mgr, err := mcpserver.NewManagerFromServers(map[string]*mcpserver.Server{"my-ski
 **Tool name conflicts** — If two skills define a tool with the same name, skillgraph-mcp prefixes both with their skill name (e.g. `github_search`, `docs_search`). The prefixed names are what `use_skill` returns and what `execute_code` expects.
 
 **Graph not updating after config edit** — The graph is loaded once at startup. Restart skillgraph-mcp to pick up manual edits to `mcp.json`'s `skillGraph` section.
+
+## 🧪 Local CI
+
+The GitHub Actions workflows in `.github/workflows/` can be run locally before pushing using [nektos/act](https://github.com/nektos/act). This catches workflow regressions that would otherwise only surface after `git push` + waiting for CI.
+
+Requires Docker. First run pulls a ~600 MB runner image; subsequent runs are cached.
+
+```sh
+go install github.com/nektos/act@latest    # one-time
+make ci                                    # runs .github/workflows/test.yml
+make ci-release TAG=v0.1.1                 # simulates release dispatch
+```
+
+Runner image and arch are pinned in `.actrc`. Use this before pushing changes that touch workflows or build scripts.

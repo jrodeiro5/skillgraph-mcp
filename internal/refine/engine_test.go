@@ -325,6 +325,10 @@ func TestOptimizeTracesSkipsLLMWhenNoErrors(t *testing.T) {
 }
 
 func TestCallOpenAICompat(t *testing.T) {
+	// Isolate from any LLM_BASE_URL the shell might have set (e.g. Mistral / Ollama)
+	// — the function reads it at call time and would bypass the mock server.
+	t.Setenv("LLM_BASE_URL", "")
+	t.Setenv("LLM_MODEL", "")
 	var gotModel string
 	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Header.Get("Authorization") != "Bearer oai-test-key" {
@@ -362,6 +366,8 @@ func TestCallOpenAICompat(t *testing.T) {
 }
 
 func TestCallOpenAICompatNoKey(t *testing.T) {
+	t.Setenv("LLM_BASE_URL", "")
+	t.Setenv("LLM_MODEL", "")
 	// Local models (Ollama) may not require an API key — no Authorization header should be sent.
 	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Header.Get("Authorization") != "" {

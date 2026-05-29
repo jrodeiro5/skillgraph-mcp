@@ -30,9 +30,11 @@ func NewManager(ctx context.Context, cfgs map[string]config.Server, graphCfg *co
 	for name, srv := range cfgs {
 		s, err := NewServer(ctx, srv)
 		if err != nil {
-			// Close any servers we already opened before returning.
-			m.Close()
-			return nil, fmt.Errorf("connecting to %q: %w", name, err)
+			// One bad downstream should not kill the entire gateway. Log and
+			// continue; the remaining servers will still be reachable. The
+			// agent can call `validate` to see per-server status.
+			slog.Warn("failed to connect to server, skipping", "server", name, "error", err)
+			continue
 		}
 		m.servers[name] = s
 		slog.Info("connected to server", "server", name)
@@ -47,6 +49,10 @@ func NewManager(ctx context.Context, cfgs map[string]config.Server, graphCfg *co
 			desc = s.Instructions()
 		}
 		m.graph.AddNode(name, graph.NodeSkill, name, desc)
+	}
+
+	if len(cfgs) > 0 && len(m.servers) == 0 {
+		return nil, fmt.Errorf("no downstream servers could be reached (%d configured, all failed)", len(cfgs))
 	}
 
 	tools, err := resolveTools(m.servers)

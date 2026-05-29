@@ -23,7 +23,6 @@ Too many MCP tools slowing your agent down? Might be a Skill Issue.
   - [Self-evolving optimization (SkillOpt)](#self-evolving-optimization-skillopt)
 - [Getting started](#getting-started) — install, config, run, diagnostics
 - [Configuration](#configuration) — flags, server types, skill graph overrides
-- [Embedding in Go](#embedding-in-go)
 - [Gotchas](#gotchas) — `--transport http`, `register_server`, blank child env
 - [Troubleshooting](#troubleshooting)
 - [Development](#development) — Makefile, MCP Inspector, local CI via act
@@ -518,48 +517,6 @@ Manual `relations` entries are merged on top of inferred ones.
 | `--host`          | `localhost`      | HTTP listen host                      |
 | `--port`          | `8080`           | HTTP listen port                      |
 | `--version`       |                  | Print version and exit                |
-
-## Embedding in Go
-
-skillgraph-mcp can be used as a library inside a Go program without running the CLI binary. Import the internal packages directly:
-
-```go
-import (
-    "github.com/jrodeiro5/skillgraph-mcp/internal/config"
-    "github.com/jrodeiro5/skillgraph-mcp/internal/mcpserver"
-    "github.com/modelcontextprotocol/go-sdk/mcp"
-)
-
-// Load config and connect to downstream servers
-servers, graphCfg, err := config.Load("mcp.json")
-mgr, err := mcpserver.NewManager(ctx, servers, graphCfg)
-defer mgr.Close()
-
-// Inspect the graph
-graph := mgr.GetGraph()
-tools := mgr.AllTools()               // all resolved tools across all skills
-dbTools := mgr.ServerTools("postgres") // tools from one skill
-
-// Proxy a tool call directly
-srv, _ := mgr.GetServer("postgres")
-result, _ := srv.CallTool(ctx, &mcp.CallToolParams{
-    Name:      "query",
-    Arguments: map[string]any{"sql": "SELECT 1"},
-})
-
-// Rebuild graph after a config change
-mgr.RebuildGraph(updatedGraphCfg)
-```
-
-If you already have an `*mcp.ClientSession` (e.g. from your own transport), wrap it without going through the config file:
-
-```go
-srv, err := mcpserver.NewServerFromSession(ctx, session, config.ServerOptions{
-    Description:  "My custom skill",
-    AllowedTools: []string{"search", "create"},
-})
-mgr, err := mcpserver.NewManagerFromServers(map[string]*mcpserver.Server{"my-skill": srv})
-```
 
 ## Gotchas
 

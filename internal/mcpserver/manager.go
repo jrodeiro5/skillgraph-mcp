@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"sort"
 	"strings"
 	"sync"
 
@@ -21,32 +22,63 @@ type Manager struct {
 }
 
 // NewManager creates a Manager by connecting to all servers in the config.
+// Downstream connections happen in parallel so total startup is O(slowest
+// server) instead of O(sum of servers) — important to stay under MCP client
+// initialize timeouts (Claude Code's is 30s).
 func NewManager(ctx context.Context, cfgs map[string]config.Server, graphCfg *config.SkillGraphConfig) (*Manager, error) {
 	m := &Manager{
 		servers: make(map[string]*Server),
 		graph:   graph.New(),
 	}
 
+	type connectResult struct {
+		name string
+		srv  config.Server
+		s    *Server
+		err  error
+	}
+
+	results := make(chan connectResult, len(cfgs))
 	for name, srv := range cfgs {
-		s, err := NewServer(ctx, srv)
-		if err != nil {
+		go func(name string, srv config.Server) {
+			s, err := NewServer(ctx, srv)
+			results <- connectResult{name: name, srv: srv, s: s, err: err}
+		}(name, srv)
+	}
+
+	// Collect results in a deterministic order: by sorted name, so logs and
+	// the resulting graph are stable across runs.
+	pending := make(map[string]connectResult, len(cfgs))
+	for i := 0; i < len(cfgs); i++ {
+		r := <-results
+		pending[r.name] = r
+	}
+	names := make([]string, 0, len(pending))
+	for name := range pending {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+
+	for _, name := range names {
+		r := pending[name]
+		if r.err != nil {
 			// One bad downstream should not kill the entire gateway. Log and
 			// continue; the remaining servers will still be reachable. The
 			// agent can call `validate` to see per-server status.
-			slog.Warn("failed to connect to server, skipping", "server", name, "error", err)
+			slog.Warn("failed to connect to server, skipping", "server", name, "error", r.err)
 			continue
 		}
-		m.servers[name] = s
+		m.servers[name] = r.s
 		slog.Info("connected to server", "server", name)
 
 		// Add Skill Node
 		desc := ""
 		if graphCfg != nil && graphCfg.Descriptions[name] != "" {
 			desc = graphCfg.Descriptions[name]
-		} else if opts := srv.Options(); opts.Description != "" {
+		} else if opts := r.srv.Options(); opts.Description != "" {
 			desc = opts.Description
-		} else if s.Instructions() != "" {
-			desc = s.Instructions()
+		} else if r.s.Instructions() != "" {
+			desc = r.s.Instructions()
 		}
 		m.graph.AddNode(name, graph.NodeSkill, name, desc)
 	}

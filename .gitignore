@@ -6,21 +6,30 @@ skillful-mcp
 *.dll
 *.so
 *.dylib
+*.old
 
 # Test and coverage
 *.out
 *.test
 *.prof
+*.cover
+coverage.html
 
 # OS / Editor
 .DS_Store
+Thumbs.db
 .idea/
 .vscode/
+.history/
 *.swp
 *.swo
+*~
+*.bak
 
 # Credentials & Local Config
 .env
+.envrc
+.direnv/
 *.key
 *token*
 passwd
@@ -30,6 +39,10 @@ config_local.json
 mcp_local.json
 deepseek_key*
 *.log
+
+# Build / Release artifacts
+dist/
+vendor/
 
 # Generated files
 .mcp_lattice/

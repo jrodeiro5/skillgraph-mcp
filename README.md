@@ -11,7 +11,7 @@ Too many MCP tools slowing your agent down? Might be a Skill Issue 😉
 
 **skillgraph-mcp** eliminates tool bloat by building a semantic capability relationship graph and turning your MCP servers into Agent Skills in an MCP-native way.
 
-- 🔍 **Progressive Disclosure** — agent sees 7 lightweight tools; downstream schemas loaded on demand
+- 🔍 **Progressive Disclosure** — agent sees 8 lightweight tools; downstream schemas loaded on demand
 - ⚡ **Code Mode** — trigger and combine multiple tool calls with Python
 - 🔒 **Secure sandbox** — code executes in a sandbox, not your shell
 - 🔌 **Any MCP client** — works with Gemini CLI, Claude Code, Codex, and more
@@ -20,11 +20,13 @@ Too many MCP tools slowing your agent down? Might be a Skill Issue 😉
 
 - [Why?](#-why)
 - [How it works](#-how-it-works)
-- [Getting started](#-getting-started)
-- [Configuration](#-configuration)
+  - [Self-Evolving Optimization (SkillOpt)](#-self-evolving-optimization-skillopt)
+- [Getting started](#-getting-started) — install, config, run, diagnostics
+- [Configuration](#-configuration) — flags, server types, skill graph overrides
 - [Embedding in Go](#-embedding-in-go)
-- [Gotchas](#️-gotchas)
+- [Gotchas](#️-gotchas) — `--transport http`, `register_server`, blank child env
 - [Troubleshooting](#-troubleshooting)
+- [Development](#-development) — Makefile, MCP Inspector, local CI via act
 
 ## ❓ Why?
 
@@ -33,7 +35,7 @@ Connecting an agent to too many tools (or MCP servers) creates
 loaded into its context window before the user says a word. Accuracy drops,
 latency increases, and adding capabilities makes the agent worse.
 
-skillgraph-mcp fixes this through **progressive disclosure**. The agent sees 7
+skillgraph-mcp fixes this through **progressive disclosure**. The agent sees 8
 lightweight gateway tools and discovers specific downstream schemas on-demand,
 collapsing thousands of tokens down to a lightweight index.
 
@@ -90,11 +92,11 @@ server, and exposes eight tools:
 
 | Tool               | Description                                                                      |
 |--------------------|----------------------------------------------------------------------------------|
-| `list_skills`      | Returns the names of all configured downstream servers                           |
-| `use_skill`        | Lists the tools and resources available in a specific skill                      |
+| `list_skills`      | Lists all configured skills with their descriptions                              |
+| `use_skill`        | Lists the tools and resources of a specific skill. Tool names match the function names available in `execute_code` (hyphens are sanitised to underscores). |
 | `read_resource`    | Reads a resource from a specific skill                                           |
 | `execute_code`     | Runs Python code in a secure [gomonty](https://github.com/ewhauser/gomonty) sandbox |
-| `register_server`  | Hot-registers a new downstream MCP server at runtime                             |
+| `register_server`  | Hot-registers a new downstream MCP server at runtime. ⚠️ See the security note under [Gotchas](#-gotchas) before exposing this over HTTP. |
 | `get_skill_graph`  | Returns the capability relationship graph                                        |
 | `plan_workflow`    | Receives a high-level goal and returns a recommended path of execution           |
 | `read_lattice`     | Reads files from the generated `.mcp_lattice` semantic documentation index       |
@@ -147,7 +149,10 @@ To enable the SkillOpt and bootstrap refinement loops, set one of these environm
 
 **Examples:**
 ```sh
-# Ollama (local, no auth)
+# Mistral (recommended — EU-hosted GDPR-friendly, 500k TPM free tier, OpenAI-compatible)
+LLM_BASE_URL=https://api.mistral.ai/v1 LLM_API_KEY=$MISTRAL_API_KEY LLM_MODEL=mistral-small-latest skillgraph-mcp --config mcp.json
+
+# Ollama (local, no auth, no data leaves the machine)
 LLM_BASE_URL=http://localhost:11434/v1 LLM_MODEL=llama3.1 skillgraph-mcp --config mcp.json
 
 # LiteLLM proxy (routes to any backend)
@@ -156,6 +161,8 @@ LLM_BASE_URL=http://localhost:4000 LLM_API_KEY=sk-... LLM_MODEL=anthropic/claude
 # OpenAI directly
 OPENAI_API_KEY=sk-... skillgraph-mcp --config mcp.json
 ```
+
+⚠️ **Privacy note**: SkillOpt sends execution trajectories (Python code, tool arguments, errors) to the configured LLM provider. If any downstream tool receives secrets as arguments — API keys, tokens, passwords — those values **will be in the prompts sent to the LLM**. Run with a local model (Ollama, vLLM) or no LLM at all if your traces may contain sensitive data.
 
 
 ### Example Code Mode Usage
@@ -266,6 +273,18 @@ Or over HTTP:
 ```sh
 skillgraph-mcp --config mcp.json --transport http --port 8080
 ```
+
+#### Diagnostics & pre-flight
+
+Before wiring the gateway into your agent it's worth checking that the environment is healthy and every downstream server actually starts. The binary ships with three read-only subcommands for this:
+
+```sh
+skillgraph-mcp doctor       --config mcp.json   # binary, config, lattice dir, LLM provider, runtime
+skillgraph-mcp validate     --config mcp.json   # connect to every downstream in parallel, table of status + tool count
+skillgraph-mcp list-skills  --config mcp.json   # connect + dump skill | tools | description
+```
+
+All three accept `--json` for machine-readable output. `validate` exits non-zero when any server fails to connect, so it works as a pre-commit / CI check.
 
 ### Connect to your agent
 
@@ -558,6 +577,10 @@ mgr, err := mcpserver.NewManagerFromServers(map[string]*mcpserver.Server{"my-ski
 
 **`mcp.json` is mutated at runtime.** The `skillGraph` section (descriptions and relations) is auto-populated and updated by the background refinement loops. Keep a copy if you want to preserve a known-good baseline, or use git to track changes.
 
+**`register_server` over `--transport http` is RCE-by-design.** The `register_server` gateway tool lets any MCP client write a new entry to `mcp.json` — including a `command` field that the gateway will then `exec`. Combined with `--transport http` (which exposes the MCP protocol over an unauthenticated HTTP endpoint), **anyone who can reach the port can register and run arbitrary processes as the gateway's user**. Stick to `--transport stdio` unless you have an authenticating reverse proxy in front, and prefer to keep `register_server` off the allow-list for HTTP deployments.
+
+**`--transport http` has no authentication.** The HTTP transport speaks raw MCP JSON-RPC with no token, header, or origin check. Treat it as `127.0.0.1`-only by default; if you need to expose it, put it behind an auth proxy (caddy, nginx, oauth2-proxy, Cloudflare Access, etc.).
+
 ## 🔧 Troubleshooting
 
 **SkillOpt loop never runs** — Check that an LLM env var is set (`LLM_BASE_URL`, `OPENAI_API_KEY`, `DEEPSEEK_API_KEY`, or `GEMINI_API_KEY`). Without one, both background loops are skipped silently on startup.
@@ -568,11 +591,31 @@ mgr, err := mcpserver.NewManagerFromServers(map[string]*mcpserver.Server{"my-ski
 
 **Graph not updating after config edit** — The graph is loaded once at startup. Restart skillgraph-mcp to pick up manual edits to `mcp.json`'s `skillGraph` section.
 
-## 🧪 Local CI
+**MCP client reports "connection timed out after 30000ms"** — Cold start of the gateway scales with the slowest downstream. The gateway connects all of them in parallel at startup, but if a single server hangs on `initialize` it can push past your client's timeout. Run `skillgraph-mcp validate --config mcp.json --timeout 25` to see exactly which one is slow; if it's a `npx` server doing a first-time download, run it once standalone to warm the npm cache.
+
+**One downstream fails, can I still use the rest?** — Yes. As of v0.1.0+, a failed `NewServer` call is logged as a warning and that server is skipped; the gateway comes up with whatever connected. The MCP-level error only surfaces when *every* configured server fails. Use `validate` to see per-server status.
+
+**Hyphenated tool names not callable from `execute_code`** — Tool names from downstream MCPs may contain hyphens (e.g. context7's `resolve-library-id`). Python identifiers can't contain hyphens, so the gateway sanitises them to underscores (`resolve_library_id`) when registering into the sandbox. `use_skill` shows the sanitised name; call it that way in `execute_code`. The wire call to the downstream server still uses the original hyphenated name.
+
+## 🧪 Development
+
+### Makefile targets
+
+| Target | Purpose |
+|---|---|
+| `make build` | Compile the binary in the project root |
+| `make test` | Run `go test ./...` with a 120 s timeout |
+| `make lint` | Run `golangci-lint` |
+| `make install` | Build and install to `~/.local/bin/skillgraph-mcp` |
+| `make inspect` | Launch the official [MCP Inspector](https://github.com/modelcontextprotocol/inspector) against the installed gateway with `CONFIG=...` |
+| `make inspect-downstream CMD="..."` | Same, but against a single downstream MCP in isolation — useful when the gateway is masking a downstream issue |
+| `make ci` / `make ci-release` | Run the GitHub Actions workflows locally via [act](https://github.com/nektos/act) |
+
+### Local CI via act
 
 The GitHub Actions workflows in `.github/workflows/` can be run locally before pushing using [nektos/act](https://github.com/nektos/act). This catches workflow regressions that would otherwise only surface after `git push` + waiting for CI.
 
-Requires Docker. First run pulls a ~600 MB runner image; subsequent runs are cached.
+Requires Docker. First run pulls a ~600 MB runner image; subsequent runs are cached. `GITHUB_TOKEN` must be exported (act uses it to clone actions from `uses:`).
 
 ```sh
 go install github.com/nektos/act@latest    # one-time

@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.1](https://github.com/jrodeiro5/skillgraph-mcp/compare/v0.1.0...v0.1.1) (2026-05-29)
+
+
+### Bug Fixes
+
+* **mcpserver:** sanitize tool names for execute_code Python sandbox ([3ff6ff2](https://github.com/jrodeiro5/skillgraph-mcp/commit/3ff6ff2cdaa6214235a91f314284d5fdb31f78a8))
+
 ## [0.1.0](https://github.com/kurtisvg/skillful-mcp/compare/v0.0.1...v0.1.0) (2026-04-06)
 
 

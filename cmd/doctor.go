@@ -28,7 +28,7 @@ func runDoctor(args []string) {
 	)
 	fs := flag.NewFlagSet("doctor", flag.ExitOnError)
 	fs.StringVar(&configPath, "config", "./mcp.json", "Path to MCP config file")
-	fs.StringVar(&latticeDir, "lattice-dir", "./.mcp_lattice", "Directory for traces and lattice docs")
+	fs.StringVar(&latticeDir, "lattice-dir", defaultLatticeDir(), "Directory for traces and lattice docs (default: user cache dir)")
 	fs.BoolVar(&jsonOut, "json", false, "Emit JSON instead of a checklist")
 	if err := fs.Parse(args); err != nil {
 		os.Exit(2)

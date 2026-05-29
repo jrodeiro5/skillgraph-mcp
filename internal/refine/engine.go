@@ -761,7 +761,7 @@ outer:
 	}
 	for _, t := range tools {
 		validNames[t.ResolvedName] = true
-		toolsBuilder.WriteString(fmt.Sprintf("- Tool Name: %s\n  Description: %s\n", t.ResolvedName, t.Description))
+		fmt.Fprintf(&toolsBuilder, "- Tool Name: %s\n  Description: %s\n", t.ResolvedName, t.Description)
 	}
 
 	// 2. Format current graph
@@ -771,20 +771,20 @@ outer:
 	// 3. Format traces
 	var tracesBuilder strings.Builder
 	for i, traj := range trajectories {
-		tracesBuilder.WriteString(fmt.Sprintf("\n--- Trace %d ---\n", i+1))
-		tracesBuilder.WriteString(fmt.Sprintf("Timestamp: %s\n", traj.Timestamp.Format(time.RFC3339)))
-		tracesBuilder.WriteString(fmt.Sprintf("Python Code:\n%s\n", traj.Code))
+		fmt.Fprintf(&tracesBuilder, "\n--- Trace %d ---\n", i+1)
+		fmt.Fprintf(&tracesBuilder, "Timestamp: %s\n", traj.Timestamp.Format(time.RFC3339))
+		fmt.Fprintf(&tracesBuilder, "Python Code:\n%s\n", traj.Code)
 		if len(traj.ToolCalls) > 0 {
 			tracesBuilder.WriteString("Tool Calls Executed:\n")
 			for _, tc := range traj.ToolCalls {
 				argsJSON, _ := json.Marshal(tc.Args)
-				tracesBuilder.WriteString(fmt.Sprintf("  - %s(args: %s) -> Result: %s (Error: %t)\n", tc.ToolName, string(argsJSON), tc.Result, tc.IsError))
+				fmt.Fprintf(&tracesBuilder, "  - %s(args: %s) -> Result: %s (Error: %t)\n", tc.ToolName, string(argsJSON), tc.Result, tc.IsError)
 			}
 		}
 		if traj.Error != "" {
-			tracesBuilder.WriteString(fmt.Sprintf("Final Execution Error: %s\n", traj.Error))
+			fmt.Fprintf(&tracesBuilder, "Final Execution Error: %s\n", traj.Error)
 		} else {
-			tracesBuilder.WriteString(fmt.Sprintf("Final Output: %s\n", traj.Output))
+			fmt.Fprintf(&tracesBuilder, "Final Output: %s\n", traj.Output)
 		}
 	}
 

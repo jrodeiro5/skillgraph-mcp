@@ -25,7 +25,7 @@ install: build
 #   make inspect                       # default config
 #   make inspect CONFIG=/path/to/mcp.json
 inspect:
-	npx -y @modelcontextprotocol/inspector \
+	npx -y @modelcontextprotocol/inspector -- \
 	  $(INSTALL_DIR)/$(BINARY) \
 	  --config $(CONFIG) \
 	  --lattice-dir $(LATTICE_DIR)

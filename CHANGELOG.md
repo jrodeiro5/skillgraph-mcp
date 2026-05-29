@@ -1,5 +1,23 @@
 # Changelog
 
+## [1.0.0](https://github.com/jrodeiro5/skillgraph-mcp/compare/v0.1.1...v1.0.0) (2026-05-29)
+
+
+### Features
+
+* **cli:** default --lattice-dir to os.UserCacheDir (ADR-0002) ([59a64fd](https://github.com/jrodeiro5/skillgraph-mcp/commit/59a64fd85dcc340aa9ca044bb5634033b5023a47))
+* **security:** gate register_server to loopback HTTP (ADR-0001) ([027d762](https://github.com/jrodeiro5/skillgraph-mcp/commit/027d762cc9bf7d3c8503da817a7b4678f6b9708b))
+
+
+### Bug Fixes
+
+* **execute_code:** write trajectory synchronously to drop t.TempDir race ([c954726](https://github.com/jrodeiro5/skillgraph-mcp/commit/c9547266282f0b66d0f392591686fdfd3f522809))
+
+
+### Documentation
+
+* **readme:** document API stability surface for v1.0 ([8d8bf0e](https://github.com/jrodeiro5/skillgraph-mcp/commit/8d8bf0ee4712cbad57ac264ec68927ed6bda4059))
+
 ## [0.1.1](https://github.com/jrodeiro5/skillgraph-mcp/compare/v0.1.0...v0.1.1) (2026-05-29)
 
 

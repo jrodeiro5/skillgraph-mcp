@@ -262,14 +262,14 @@ func resolveTools(servers map[string]*Server) ([]Tool, error) {
 	var resolved []Tool
 	for name, entries := range byName {
 		if len(entries) == 1 {
-			t, err := newTool(name, name, entries[0].serverName, entries[0].tool)
+			t, err := newTool(pythonizeName(name), name, entries[0].serverName, entries[0].tool)
 			if err != nil {
 				return nil, err
 			}
 			resolved = append(resolved, t)
 		} else {
 			for _, e := range entries {
-				t, err := newTool(e.serverName+"_"+name, name, e.serverName, e.tool)
+				t, err := newTool(pythonizeName(e.serverName+"_"+name), name, e.serverName, e.tool)
 				if err != nil {
 					return nil, err
 				}
@@ -278,6 +278,37 @@ func resolveTools(servers map[string]*Server) ([]Tool, error) {
 		}
 	}
 	return resolved, nil
+}
+
+// pythonizeName converts an MCP tool name into a valid Python identifier so
+// the execute_code gomonty sandbox can resolve it (gomonty looks up function
+// names verbatim; "resolve-library-id" is not callable in Python). The
+// OriginalName field on Tool keeps the wire-format name used when calling
+// downstream MCP servers, so this rewrite is purely a sandbox-facing concern.
+//
+// Replaces any character outside [A-Za-z0-9_] with '_'. If the first
+// character is a digit, an underscore is prepended so the result is a legal
+// identifier start.
+func pythonizeName(s string) string {
+	if s == "" {
+		return "_"
+	}
+	out := make([]byte, 0, len(s))
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+		switch {
+		case c >= 'a' && c <= 'z',
+			c >= 'A' && c <= 'Z',
+			c == '_',
+			c >= '0' && c <= '9' && i > 0:
+			out = append(out, c)
+		case c >= '0' && c <= '9':
+			out = append(out, '_', c)
+		default:
+			out = append(out, '_')
+		}
+	}
+	return string(out)
 }
 
 func (m *Manager) GetServer(name string) (*Server, error) {

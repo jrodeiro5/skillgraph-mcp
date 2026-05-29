@@ -7,6 +7,8 @@
 
 Too many MCP tools slowing your agent down? Might be a Skill Issue 😉
 
+> **Fork notice.** skillgraph-mcp builds on top of [kurtisvg/skillful-mcp](https://github.com/kurtisvg/skillful-mcp) by Kurtis Van Gent (MIT). This fork adds: a semantic skill graph + `plan_workflow` tool, a self-evolving description loop (SkillOpt), parallel downstream connection on startup, graceful degradation when individual downstreams fail, CLI subcommands (`doctor`, `validate`, `list-skills`), and Mistral as the recommended LLM provider.
+
 **skillgraph-mcp** eliminates tool bloat by building a semantic capability relationship graph and turning your MCP servers into Agent Skills in an MCP-native way.
 
 - 🔍 **Progressive Disclosure** — agent sees 7 lightweight tools; downstream schemas loaded on demand
@@ -84,17 +86,18 @@ flowchart LR
 ```
 
 skillgraph-mcp reads a standard `mcp.json` config, connects to each downstream
-server, and exposes seven tools:
+server, and exposes eight tools:
 
-| Tool              | Description                                                                      |
-|-------------------|----------------------------------------------------------------------------------|
-| `list_skills`     | Returns the names of all configured downstream servers                           |
-| `use_skill`       | Lists the tools and resources available in a specific skill                      |
-| `read_resource`   | Reads a resource from a specific skill                                           |
-| `execute_code`    | Runs Python code in a secure [gomonty](https://github.com/ewhauser/gomonty) sandbox |
-| `get_skill_graph` | Returns the capability relationship graph                                        |
-| `plan_workflow`   | Receives a high-level goal and returns a recommended path of execution           |
-| `read_lattice`    | Reads files from the generated `.mcp_lattice` semantic documentation index       |
+| Tool               | Description                                                                      |
+|--------------------|----------------------------------------------------------------------------------|
+| `list_skills`      | Returns the names of all configured downstream servers                           |
+| `use_skill`        | Lists the tools and resources available in a specific skill                      |
+| `read_resource`    | Reads a resource from a specific skill                                           |
+| `execute_code`     | Runs Python code in a secure [gomonty](https://github.com/ewhauser/gomonty) sandbox |
+| `register_server`  | Hot-registers a new downstream MCP server at runtime                             |
+| `get_skill_graph`  | Returns the capability relationship graph                                        |
+| `plan_workflow`    | Receives a high-level goal and returns a recommended path of execution           |
+| `read_lattice`     | Reads files from the generated `.mcp_lattice` semantic documentation index       |
 
 The typical agent workflow:
 

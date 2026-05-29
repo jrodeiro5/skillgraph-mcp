@@ -53,7 +53,7 @@ Environment variables for the refine/SkillOpt loop (in priority order): `LLM_BAS
 
 ## Architecture
 
-skillgraph-mcp is an **MCP gateway**: the agent connects to this server and sees 7 tools, while this server proxies to N downstream MCP servers. The core idea is progressive disclosure — the agent starts with 4 discovery tools and traverses a semantic skill graph to find specific tools on demand, rather than receiving 80+ tool schemas upfront.
+skillgraph-mcp is an **MCP gateway**: the agent connects to this server and sees 8 tools, while this server proxies to N downstream MCP servers. The core idea is progressive disclosure — the agent starts with a small set of discovery tools (`list_skills`, `use_skill`, `read_resource`, `read_lattice`) and traverses a semantic skill graph to find specific tools on demand, rather than receiving 80+ tool schemas upfront.
 
 ### Package dependency order (leaf → root)
 
@@ -73,7 +73,7 @@ tools    refine  docs
 
 ### Key architectural decisions
 
-**Tool registration** (`internal/app/server.go` + `internal/tools/*.go`): Each of the 7 gateway tools is registered as a closure capturing `*mcpserver.Manager`. The pattern is consistent — `Register*` functions in each tool file. Adding a new tool means adding a file in `internal/tools/` and one `Register*` call in `app/server.go`.
+**Tool registration** (`internal/app/server.go` + `internal/tools/*.go`): Each of the 8 gateway tools is registered as a closure capturing `*mcpserver.Manager`. The pattern is consistent — `Register*` functions in each tool file. Adding a new tool means adding a file in `internal/tools/` and one `Register*` call in `app/server.go`.
 
 **Two background goroutines** (both launched from `internal/refine/engine.go`):
 1. Bootstrap loop — fetches GitHub READMEs into `.mcp_lattice/`, then sends server tools + README to LLM to generate initial descriptions and graph relations, merges into `mcp.json`.

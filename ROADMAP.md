@@ -75,3 +75,17 @@ This document tracks the implementation plan for the skill graph model in the `s
 - [x] **Hold-out validation gate**: accept SkillOpt edits only if they do not regress a reference trace set (aligned with arXiv:2605.23904, which uses a held-out validation set).
 - [x] **Edit history with rollback**: save a change history for `mcp.json` to allow automatic revert if routing quality degrades.
 - [x] **Graph topology ablation**: compare typed relations (`PRODUCES`, `REQUIRES`) against a flat graph to measure actual added value. Methodology, task suite design, instrumentation guide, and statistical validity requirements documented in `BENCHMARKS.md`.
+
+## Post-v0.1.0 hardening [Done]
+
+Operational and reliability improvements added after the first public release.
+
+- [x] **Security**: fix path traversal in `read_lattice` prefix check (use trailing separator) and protect `Manager` read methods (`AllTools`, `ServerTools`, `GetServer`, `ListServerNames`) with `RLock` against the `AddServer` writer.
+- [x] **Refine resilience**: retry with exponential backoff and ±50 % jitter on transient LLM errors (5xx, 429, net timeouts); bootstrap concurrency cap (semaphore = 3) plus 0–500 ms startup jitter to keep free-tier rate limits from rejecting bursts.
+- [x] **Graceful degradation**: a failed downstream connect is logged and skipped instead of aborting `NewManager` — gateway comes up with the surviving servers; only errors when every configured server fails.
+- [x] **Parallel downstream startup**: one goroutine per server with deterministic graph build by sorted name; gateway responds to `initialize` in ~1 s instead of ~6 s with 10 downstreams (well under the 30 s MCP client timeout).
+- [x] **NPX wrapper README detection**: `extractNPMPackage` recognises `npx-mcp`-style wrappers, absolute paths and scoped/versioned package specs so the bootstrap loop can fetch READMEs without requiring a literal `npx` command. Refine proceeds without a README when no source is detected (sentinel file mechanism).
+- [x] **Tool-name sanitisation**: `pythonizeName` converts hyphens and other non-identifier characters to underscores when registering downstream tools into the `execute_code` gomonty sandbox, so hyphenated names like `resolve-library-id` are callable as `resolve_library_id` from Python. `OriginalName` is preserved for the wire call to the downstream server.
+- [x] **CLI subcommands**: `skillgraph-mcp doctor`, `validate` and `list-skills` for environment diagnosis and per-server pre-flight without restarting the agent.
+- [x] **Local CI via act**: `make ci` and `make ci-release` Makefile targets to run GitHub Actions workflows locally before pushing; `.actrc` pins the runner image.
+- [x] **Inspector integration**: `make inspect` and `make inspect-downstream CMD=...` launch the official MCP Inspector against the gateway or any downstream in isolation.

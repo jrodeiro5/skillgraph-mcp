@@ -40,8 +40,12 @@ jobs:
           go-version: "1.26.1"
       - name: Build
         run: go build ./...
-      - name: Test
-        run: go test ./... -timeout 60s
+      - name: Test (with race detector)
+        # CGO_ENABLED=1 is the default on ubuntu-latest runners, but assert it
+        # explicitly so future runner image changes don't silently disable -race.
+        env:
+          CGO_ENABLED: "1"
+        run: go test -race -timeout 120s ./...
 
   lint:
     if: "github.event.action != 'labeled' || github.event.label.name == 'tests: run'"

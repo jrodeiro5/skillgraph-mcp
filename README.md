@@ -25,6 +25,7 @@ Too many MCP tools slowing your agent down? Might be a Skill Issue.
 - [Configuration](#configuration) — flags, server types, skill graph overrides
 - [Gotchas](#gotchas) — `--transport http`, `register_server`, blank child env
 - [Troubleshooting](#troubleshooting)
+- [Stability and versioning](#stability-and-versioning) — public API surface, semver promise
 - [Development](#development) — Makefile, MCP Inspector, local CI via act
 
 ## Why?
@@ -553,6 +554,19 @@ Manual `relations` entries are merged on top of inferred ones.
 **One downstream fails, can I still use the rest?** — Yes. As of v0.1.0+, a failed `NewServer` call is logged as a warning and that server is skipped; the gateway comes up with whatever connected. The MCP-level error only surfaces when *every* configured server fails. Use `validate` to see per-server status.
 
 **Hyphenated tool names not callable from `execute_code`** — Tool names from downstream MCPs may contain hyphens (e.g. context7's `resolve-library-id`). Python identifiers can't contain hyphens, so the gateway sanitises them to underscores (`resolve_library_id`) when registering into the sandbox. `use_skill` shows the sanitised name; call it that way in `execute_code`. The wire call to the downstream server still uses the original hyphenated name.
+
+## Stability and versioning
+
+skillgraph-mcp follows [semantic versioning](https://semver.org/) from v1.0 onwards. The public API surface is fixed and documented in [ADR-0003](docs/adr/0003-versioning-and-public-api-surface.md):
+
+- The `mcp.json` schema (server entries, `skillGraph` overrides, `${VAR}` interpolation).
+- The CLI flags and subcommands listed under [Flags](#flags) and [Diagnostics & pre-flight](#diagnostics--pre-flight).
+- The eight gateway tool names and their JSON input schemas.
+- The file formats inside `.mcp_lattice/` (`traces/*.json`, `skills.md`, `relations.md`, `history/*.json`).
+
+Breaking changes to any of the above require a major version bump. Adding tools, flags, or fields is a minor bump. Bug fixes and internal refactors are patches.
+
+The following are **not** part of the public API and may change in any release: anything under `internal/`, the LLM prompt text used by SkillOpt and the bootstrap loops, log format and slog field names, the directory layout inside `~/.cache/skillgraph-mcp/` beyond the documented filenames, and the Docker image's internal filesystem layout.
 
 ## Development
 

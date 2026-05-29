@@ -9,12 +9,12 @@ import (
 
 func TestParseGitHubURL(t *testing.T) {
 	tests := []struct {
-		url      string
-		owner    string
-		repo     string
-		subpath  string
-		branch   string
-		wantErr  bool
+		url     string
+		owner   string
+		repo    string
+		subpath string
+		branch  string
+		wantErr bool
 	}{
 		{
 			url:     "https://github.com/google/go-github",

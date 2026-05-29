@@ -49,7 +49,7 @@ func TestCallDeepSeek(t *testing.T) {
 				},
 			},
 		}
-		json.NewEncoder(w).Encode(resp)
+		_ = json.NewEncoder(w).Encode(resp)
 	}))
 	defer mockServer.Close()
 
@@ -86,7 +86,7 @@ func TestCallGemini(t *testing.T) {
 				},
 			},
 		}
-		json.NewEncoder(w).Encode(resp)
+		_ = json.NewEncoder(w).Encode(resp)
 	}))
 	defer mockServer.Close()
 
@@ -218,7 +218,7 @@ func TestRefineServerExecution(t *testing.T) {
 				},
 			},
 		}
-		json.NewEncoder(w).Encode(resp)
+		_ = json.NewEncoder(w).Encode(resp)
 	}))
 	defer mockServer.Close()
 
@@ -345,7 +345,7 @@ func TestCallOpenAICompat(t *testing.T) {
 				{"message": map[string]string{"content": `{"status": "openai-ok"}`}},
 			},
 		}
-		json.NewEncoder(w).Encode(resp)
+		_ = json.NewEncoder(w).Encode(resp)
 	}))
 	defer mockServer.Close()
 
@@ -379,7 +379,7 @@ func TestCallOpenAICompatNoKey(t *testing.T) {
 				{"message": map[string]string{"content": `{"ok":true}`}},
 			},
 		}
-		json.NewEncoder(w).Encode(resp)
+		_ = json.NewEncoder(w).Encode(resp)
 	}))
 	defer mockServer.Close()
 
@@ -616,7 +616,7 @@ func TestOptimizeTracesExecution(t *testing.T) {
 				},
 			},
 		}
-		json.NewEncoder(w).Encode(resp)
+		_ = json.NewEncoder(w).Encode(resp)
 	}))
 	defer mockServer.Close()
 

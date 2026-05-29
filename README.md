@@ -5,30 +5,30 @@
 [![Go Report Card](https://goreportcard.com/badge/github.com/jrodeiro5/skillgraph-mcp)](https://goreportcard.com/report/github.com/jrodeiro5/skillgraph-mcp)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-Too many MCP tools slowing your agent down? Might be a Skill Issue 😉
+Too many MCP tools slowing your agent down? Might be a Skill Issue.
 
 > **Fork notice.** skillgraph-mcp builds on top of [kurtisvg/skillful-mcp](https://github.com/kurtisvg/skillful-mcp) by Kurtis Van Gent (MIT). This fork adds: a semantic skill graph + `plan_workflow` tool, a self-evolving description loop (SkillOpt), parallel downstream connection on startup, graceful degradation when individual downstreams fail, CLI subcommands (`doctor`, `validate`, `list-skills`), and Mistral as the recommended LLM provider.
 
 **skillgraph-mcp** eliminates tool bloat by building a semantic capability relationship graph and turning your MCP servers into Agent Skills in an MCP-native way.
 
-- 🔍 **Progressive Disclosure** — agent sees 8 lightweight tools; downstream schemas loaded on demand
-- ⚡ **Code Mode** — trigger and combine multiple tool calls with Python
-- 🔒 **Secure sandbox** — code executes in a sandbox, not your shell
-- 🔌 **Any MCP client** — works with Gemini CLI, Claude Code, Codex, and more
+- **Progressive Disclosure** — agent sees 8 lightweight tools; downstream schemas loaded on demand
+- **Code Mode** — trigger and combine multiple tool calls with Python
+- **Secure sandbox** — code executes in a sandbox, not your shell
+- **Any MCP client** — works with Gemini CLI, Claude Code, Codex, and more
 
 ## Table of contents
 
-- [Why?](#-why)
-- [How it works](#-how-it-works)
-  - [Self-Evolving Optimization (SkillOpt)](#-self-evolving-optimization-skillopt)
-- [Getting started](#-getting-started) — install, config, run, diagnostics
-- [Configuration](#-configuration) — flags, server types, skill graph overrides
-- [Embedding in Go](#-embedding-in-go)
-- [Gotchas](#️-gotchas) — `--transport http`, `register_server`, blank child env
-- [Troubleshooting](#-troubleshooting)
-- [Development](#-development) — Makefile, MCP Inspector, local CI via act
+- [Why?](#why)
+- [How it works](#how-it-works)
+  - [Self-evolving optimization (SkillOpt)](#self-evolving-optimization-skillopt)
+- [Getting started](#getting-started) — install, config, run, diagnostics
+- [Configuration](#configuration) — flags, server types, skill graph overrides
+- [Embedding in Go](#embedding-in-go)
+- [Gotchas](#gotchas) — `--transport http`, `register_server`, blank child env
+- [Troubleshooting](#troubleshooting)
+- [Development](#development) — Makefile, MCP Inspector, local CI via act
 
-## ❓ Why?
+## Why?
 
 Connecting an agent to too many tools (or MCP servers) creates
 [tool bloat][tool-bloat]. An agent with access to 5 servers might have 80+ tools
@@ -43,7 +43,7 @@ collapsing thousands of tokens down to a lightweight index.
 
 [tool-bloat]: https://kvg.dev/posts/20260125-skills-and-mcp/
 
-## 💡 How it works
+## How it works
 
 ```mermaid
 flowchart LR
@@ -96,7 +96,7 @@ server, and exposes eight tools:
 | `use_skill`        | Lists the tools and resources of a specific skill. Tool names match the function names available in `execute_code` (hyphens are sanitised to underscores). |
 | `read_resource`    | Reads a resource from a specific skill                                           |
 | `execute_code`     | Runs Python code in a secure [gomonty](https://github.com/ewhauser/gomonty) sandbox |
-| `register_server`  | Hot-registers a new downstream MCP server at runtime. ⚠️ See the security note under [Gotchas](#-gotchas) before exposing this over HTTP. |
+| `register_server`  | Hot-registers a new downstream MCP server at runtime. **Warning:** see the security note under [Gotchas](#gotchas) before exposing this over HTTP. |
 | `get_skill_graph`  | Returns the capability relationship graph                                        |
 | `plan_workflow`    | Receives a high-level goal and returns a recommended path of execution           |
 | `read_lattice`     | Reads files from the generated `.mcp_lattice` semantic documentation index       |
@@ -129,7 +129,7 @@ sequenceDiagram
     GW-->>A: computed result + trace written
 ```
 
-### 🔄 Self-Evolving Optimization (SkillOpt)
+### Self-evolving optimization (SkillOpt)
 
 `skillgraph-mcp` implements a self-evolving skill optimization mechanism inspired by Microsoft's **SkillOpt** framework (arXiv:2605.23904):
 * **Trajectory Logging:** When the agent runs Python code via `execute_code`, the gateway records execution trajectories (rollouts) including arguments, results, and runtime errors under `.mcp_lattice/traces/` (relative to the CWD where skillgraph-mcp is launched).
@@ -162,10 +162,10 @@ LLM_BASE_URL=http://localhost:4000 LLM_API_KEY=sk-... LLM_MODEL=anthropic/claude
 OPENAI_API_KEY=sk-... skillgraph-mcp --config mcp.json
 ```
 
-⚠️ **Privacy note**: SkillOpt sends execution trajectories (Python code, tool arguments, errors) to the configured LLM provider. If any downstream tool receives secrets as arguments — API keys, tokens, passwords — those values **will be in the prompts sent to the LLM**. Run with a local model (Ollama, vLLM) or no LLM at all if your traces may contain sensitive data.
+**Warning — privacy:** SkillOpt sends execution trajectories (Python code, tool arguments, errors) to the configured LLM provider. If any downstream tool receives secrets as arguments — API keys, tokens, passwords — those values **will be in the prompts sent to the LLM**. Run with a local model (Ollama, vLLM) or no LLM at all if your traces may contain sensitive data.
 
 
-### Example Code Mode Usage
+### Example code mode usage
 
 After discovering tools via `use_skill`, the agent can call them directly by
 name inside `execute_code` — chaining outputs from one tool into another:
@@ -183,7 +183,7 @@ arguments. If two skills define a tool with the same name, the function is
 prefixed with the skill name (e.g. `database_search`, `docs_search`). Tool
 names returned by `use_skill` always match the function names in `execute_code`.
 
-## 🚀 Getting started
+## Getting started
 
 ### Install
 
@@ -377,7 +377,7 @@ specific capability.
 }
 ```
 
-## 📝 Configuration
+## Configuration
 
 Each entry in `mcpServers` is a downstream server that becomes a skill. The key
 is the skill name. The value depends on the transport type.
@@ -519,7 +519,7 @@ Manual `relations` entries are merged on top of inferred ones.
 | `--port`          | `8080`           | HTTP listen port                      |
 | `--version`       |                  | Print version and exit                |
 
-## 🔌 Embedding in Go
+## Embedding in Go
 
 skillgraph-mcp can be used as a library inside a Go program without running the CLI binary. Import the internal packages directly:
 
@@ -561,7 +561,7 @@ srv, err := mcpserver.NewServerFromSession(ctx, session, config.ServerOptions{
 mgr, err := mcpserver.NewManagerFromServers(map[string]*mcpserver.Server{"my-skill": srv})
 ```
 
-## ⚠️ Gotchas
+## Gotchas
 
 **STDIO child processes get a blank environment.** When `command` servers are launched, they inherit only the variables explicitly listed in the `env` block — not the parent shell's environment. If a child process needs `PATH`, `HOME`, or any other system variable, you must pass it explicitly:
 
@@ -581,7 +581,7 @@ mgr, err := mcpserver.NewManagerFromServers(map[string]*mcpserver.Server{"my-ski
 
 **`--transport http` has no authentication.** The HTTP transport speaks raw MCP JSON-RPC with no token, header, or origin check. Treat it as `127.0.0.1`-only by default; if you need to expose it, put it behind an auth proxy (caddy, nginx, oauth2-proxy, Cloudflare Access, etc.).
 
-## 🔧 Troubleshooting
+## Troubleshooting
 
 **SkillOpt loop never runs** — Check that an LLM env var is set (`LLM_BASE_URL`, `OPENAI_API_KEY`, `DEEPSEEK_API_KEY`, or `GEMINI_API_KEY`). Without one, both background loops are skipped silently on startup.
 
@@ -597,7 +597,7 @@ mgr, err := mcpserver.NewManagerFromServers(map[string]*mcpserver.Server{"my-ski
 
 **Hyphenated tool names not callable from `execute_code`** — Tool names from downstream MCPs may contain hyphens (e.g. context7's `resolve-library-id`). Python identifiers can't contain hyphens, so the gateway sanitises them to underscores (`resolve_library_id`) when registering into the sandbox. `use_skill` shows the sanitised name; call it that way in `execute_code`. The wire call to the downstream server still uses the original hyphenated name.
 
-## 🧪 Development
+## Development
 
 ### Makefile targets
 

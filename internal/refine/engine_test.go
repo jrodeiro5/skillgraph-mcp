@@ -451,7 +451,7 @@ func TestSnapshotCreatedBeforeEdit(t *testing.T) {
 
 	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]any{
+		_ = json.NewEncoder(w).Encode(map[string]any{
 			"choices": []map[string]any{
 				{"message": map[string]string{"content": `{"descriptions":{"tool_a":"improved"},"relations":[]}`}},
 			},
@@ -789,7 +789,7 @@ func TestHoldoutGateFiltersRegressionInOptimize(t *testing.T) {
 	// LLM proposes a description that has zero overlap with the hold-out trace.
 	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]any{
+		_ = json.NewEncoder(w).Encode(map[string]any{
 			"choices": []map[string]any{
 				{"message": map[string]string{"content": `{"descriptions":{"tool_a":"processes unrelated data pipelines"},"relations":[]}`}},
 			},

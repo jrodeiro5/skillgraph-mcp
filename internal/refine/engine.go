@@ -140,7 +140,7 @@ func refineServer(ctx context.Context, provider, key, configPath string, mgr *mc
 
 	var toolsBuilder strings.Builder
 	for _, t := range tools {
-		toolsBuilder.WriteString(fmt.Sprintf("- Tool Name: %s\n  Description: %s\n  Parameters:\n", t.ResolvedName, t.Description))
+		fmt.Fprintf(&toolsBuilder, "- Tool Name: %s\n  Description: %s\n  Parameters:\n", t.ResolvedName, t.Description)
 		for _, p := range t.Params {
 			reqStr := "optional"
 			if p.Required {
@@ -153,9 +153,9 @@ func refineServer(ctx context.Context, provider, key, configPath string, mgr *mc
 				}
 			}
 			if pDesc != "" {
-				toolsBuilder.WriteString(fmt.Sprintf("    * %s (%s): %s\n", p.Name, reqStr, pDesc))
+				fmt.Fprintf(&toolsBuilder, "    * %s (%s): %s\n", p.Name, reqStr, pDesc)
 			} else {
-				toolsBuilder.WriteString(fmt.Sprintf("    * %s (%s)\n", p.Name, reqStr))
+				fmt.Fprintf(&toolsBuilder, "    * %s (%s)\n", p.Name, reqStr)
 			}
 		}
 		toolsBuilder.WriteString("\n")

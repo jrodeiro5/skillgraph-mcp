@@ -100,19 +100,17 @@ func newExecuteCode(mgr *mcpserver.Manager, latticeDir string) func(context.Cont
 			traj.Output = value.String()
 		}
 
-		// Save trace in background (non-blocking)
-		go func() {
-			tracesDir := filepath.Join(latticeDir, "traces")
-			if err := os.MkdirAll(tracesDir, 0755); err != nil {
-				return
+		// Save trace synchronously. Writing a few KB of JSON to local disk is
+		// sub-millisecond on any sane FS; the previous fire-and-forget goroutine
+		// raced with t.TempDir() cleanup in tests and silently dropped traces
+		// when the process exited mid-write (also a real risk on SIGTERM).
+		tracesDir := filepath.Join(latticeDir, "traces")
+		if err := os.MkdirAll(tracesDir, 0755); err == nil {
+			if data, jerr := json.MarshalIndent(traj, "", "  "); jerr == nil {
+				filename := fmt.Sprintf("%d_%d.json", time.Now().UnixNano(), rand.Intn(100000))
+				_ = os.WriteFile(filepath.Join(tracesDir, filename), data, 0644)
 			}
-			data, err := json.MarshalIndent(traj, "", "  ")
-			if err != nil {
-				return
-			}
-			filename := fmt.Sprintf("%d_%d.json", time.Now().UnixNano(), rand.Intn(100000))
-			_ = os.WriteFile(filepath.Join(tracesDir, filename), data, 0644)
-		}()
+		}
 
 		if runErr != nil {
 			result := &mcp.CallToolResult{}

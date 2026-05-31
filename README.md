@@ -191,15 +191,15 @@ names returned by `use_skill` always match the function names in `execute_code`.
 <summary><strong>Download a binary</strong></summary>
 
 ```sh
-VERSION="0.1.0"
 OS="linux"       # or: darwin, windows
 ARCH="amd64"     # or: arm64
 
-curl -L "https://github.com/jrodeiro5/skillgraph-mcp/releases/download/v${VERSION}/skillgraph-mcp_${VERSION}_${OS}_${ARCH}" -o skillgraph-mcp
+VERSION=$(curl -fsSL https://api.github.com/repos/jrodeiro5/skillgraph-mcp/releases/latest | grep '"tag_name"' | sed 's/.*"v\([^"]*\)".*/\1/')
+curl -fsSL "https://github.com/jrodeiro5/skillgraph-mcp/releases/download/v${VERSION}/skillgraph-mcp_${VERSION}_${OS}_${ARCH}" -o skillgraph-mcp
 chmod +x skillgraph-mcp
 ```
 
-Or download from the [releases page](https://github.com/jrodeiro5/skillgraph-mcp/releases/latest).
+Or browse the [releases page](https://github.com/jrodeiro5/skillgraph-mcp/releases/latest) to pick a specific version.
 
 </details>
 
@@ -250,13 +250,10 @@ Create an `mcp.json` file with your downstream servers:
         "POSTGRES_DATABASE": "${POSTGRES_DATABASE}"
       }
     },
-    "github-issues": {
-      "type": "http",
-      "url": "https://api.githubcopilot.com/mcp/x/issues",
-      "headers": {
-        "Authorization": "Bearer ${GITHUB_TOKEN}"
-      },
-      "description": "GitHub issue management — create, search, update, and comment on issues. Use when the user mentions bugs, feature requests, or issue triage."
+    "memory": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-memory"],
+      "description": "Persistent agent memory — store entities, observations, and relations across sessions. Use when the agent needs to remember facts, people, or decisions."
     }
   }
 }

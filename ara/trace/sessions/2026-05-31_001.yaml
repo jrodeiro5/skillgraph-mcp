@@ -1,0 +1,62 @@
+session:
+  id: "2026-05-31_001"
+  timestamp: "2026-05-31T00:00"
+  summary: "Readiness assessment, README fixes (install snippet + demo config), token measurements, abstract draft, ARA init"
+
+events_logged:
+  - type: experiment
+    id: N02
+    provenance: ai-executed
+    summary: "Measured gateway vs raw token cost: 287 vs ~3,660 tokens (92% reduction)"
+  - type: decision
+    id: N05
+    provenance: user
+    summary: "Replace github-issues with memory server in Getting Started example"
+  - type: decision
+    id: N06
+    provenance: user
+    summary: "Fix install snippet to dynamic GitHub API version resolution"
+  - type: decision
+    id: N03
+    provenance: ai-suggested
+    summary: "Use playwright as empirical sample for per-tool token rate"
+
+ai_actions:
+  - action: "Fixed README install snippet (hardcoded 0.1.0 → dynamic API lookup)"
+    provenance: ai-executed
+    files_changed: ["README.md"]
+  - action: "Replaced github-issues example with memory server in Getting Started"
+    provenance: ai-executed
+    files_changed: ["README.md"]
+  - action: "Measured use_skill playwright response: 2981 chars, 745 tokens"
+    provenance: ai-executed
+    files_changed: []
+  - action: "Initialized ARA structure and seeded all core files"
+    provenance: ai-executed
+    files_changed:
+      - "ara/PAPER.md"
+      - "ara/logic/claims.md"
+      - "ara/logic/problem.md"
+      - "ara/evidence/tables/T01-token-measurements.md"
+      - "ara/trace/exploration_tree.yaml"
+      - "ara/trace/sessions/session_index.yaml"
+
+claims_touched:
+  - id: C01
+    action: created
+    provenance: ai-executed
+  - id: C02
+    action: created
+    provenance: ai-suggested
+  - id: C03
+    action: created
+    provenance: ai-suggested
+
+open_threads:
+  - "C02 needs scaling experiment (measure list_skills growth with 5, 10, 20 servers)"
+  - "C03 needs before/after SkillOpt evaluation design"
+  - "Demo transcript (agent using list_skills → use_skill → execute_code) not yet captured"
+  - "Paper sections beyond abstract not yet drafted"
+
+ai_suggestions_pending:
+  - "skillListingBudgetFraction setting in Claude Code may be relevant to paper (limits skills loaded by quality)"

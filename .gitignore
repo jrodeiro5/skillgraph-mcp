@@ -51,3 +51,4 @@ vendor/
 # act (nektos/act) local CI artifacts
 .act-cache/
 act-event.json
+ara/

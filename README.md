@@ -564,3 +564,19 @@ mgr, err := mcpserver.NewManagerFromServers(map[string]*mcpserver.Server{"my-ski
 **Tool name conflicts** — If two skills define a tool with the same name, skillgraph-mcp prefixes both with their skill name (e.g. `github_search`, `docs_search`). The prefixed names are what `use_skill` returns and what `execute_code` expects.
 
 **Graph not updating after config edit** — The graph is loaded once at startup. Restart skillgraph-mcp to pick up manual edits to `mcp.json`'s `skillGraph` section.
+
+**Startup hangs / 60-second timeout** — Remote HTTP servers (`type: http`) and OAuth-based `mcp-remote` servers block skillgraph's MCP handshake until every downstream connection is established. If any remote server is slow or requires interactive OAuth (e.g. `mcp-remote` pointing at a Google API endpoint), skillgraph will hang for the full connection timeout before Claude Code marks it as failed. Move remote HTTP servers to Claude Code's own MCP config instead, or remove them from `mcp.json` entirely.
+
+**Unwanted MCP servers from your claude.ai account** — Claude Code syncs MCP servers configured in your claude.ai web settings by default. To suppress them, set `ENABLE_CLAUDEAI_MCP_SERVERS=false` in your environment or in `~/.claude/settings.json` under `env`.
+
+**`execute_code` prefers `return` over `print`** — The sandbox surfaces the return value of your code. Both work, but `return result` is clearer and guaranteed to be the primary output. When code returns `None` (no explicit `return`), skillgraph falls back to any captured stdout — so `print()` still works as a secondary path.
+
+```python
+# ✅ Preferred
+result = my_tool(arg="value")
+return result
+
+# ✅ Also works (fallback path)
+result = my_tool(arg="value")
+print(result)
+```

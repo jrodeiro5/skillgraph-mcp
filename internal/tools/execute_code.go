@@ -1,6 +1,7 @@
 package tools
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -85,9 +86,16 @@ func newExecuteCode(mgr *mcpserver.Manager, latticeDir string) func(context.Cont
 		collector := &TraceCollector{}
 		ctxWithTrace := context.WithValue(ctx, traceCollectorKey, collector)
 
+		var stdoutBuf bytes.Buffer
 		value, runErr := runner.Run(ctxWithTrace, monty.RunOptions{
 			Functions: fns,
+			Print:     monty.WriterPrintCallback(&stdoutBuf),
 		})
+
+		// Fall back to captured stdout when code uses print() instead of return.
+		if value == monty.None() && stdoutBuf.Len() > 0 {
+			value = monty.String(stdoutBuf.String())
+		}
 
 		traj := trace.Trajectory{
 			Timestamp: time.Now(),
@@ -116,7 +124,11 @@ func newExecuteCode(mgr *mcpserver.Manager, latticeDir string) func(context.Cont
 
 		if runErr != nil {
 			result := &mcp.CallToolResult{}
-			result.SetError(fmt.Errorf("runtime error: %w", runErr))
+			if stdoutBuf.Len() > 0 {
+				result.SetError(fmt.Errorf("runtime error: %w\npartial output:\n%s", runErr, stdoutBuf.String()))
+			} else {
+				result.SetError(fmt.Errorf("runtime error: %w", runErr))
+			}
 			return result, nil, nil
 		}
 

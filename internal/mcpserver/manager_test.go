@@ -1,9 +1,12 @@
 package mcpserver
 
 import (
+	"context"
+	"strings"
 	"sync"
 	"testing"
 
+	"github.com/jrodeiro5/skillgraph-mcp/internal/config"
 	"github.com/jrodeiro5/skillgraph-mcp/internal/graph"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
@@ -334,6 +337,43 @@ func TestManagerGraph(t *testing.T) {
 	}
 	if !hasInferred {
 		t.Error("missing inferred relation 'create_issue -PREREQUISITE_FOR-> comment_on_issue'")
+	}
+}
+
+// TestNewManagerSkipsFailedDownstream verifies that a single failing downstream
+// server does not abort the whole gateway: the Manager comes up with the rest.
+// Regression for the case where a bad PATH (e.g. pnpm shim needing `node`)
+// killed all 10 working servers because of one EOF.
+func TestNewManagerSkipsFailedDownstream(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+
+	cfgs := map[string]config.Server{
+		"broken": &config.StdioServer{
+			Type:    "stdio",
+			Command: "/path/that/definitely/does/not/exist-skillgraph",
+			Args:    []string{},
+		},
+	}
+
+	// All-broken should still error out (no point continuing with zero servers).
+	if _, err := NewManager(ctx, cfgs, nil); err == nil {
+		t.Fatal("expected error when all configured servers fail, got nil")
+	} else if !strings.Contains(err.Error(), "all failed") {
+		t.Errorf("expected 'all failed' in error, got: %v", err)
+	}
+}
+
+// TestNewManagerEmptyConfig succeeds with zero servers — used by callers that
+// register downstreams dynamically via register_server.
+func TestNewManagerEmptyConfig(t *testing.T) {
+	t.Parallel()
+	m, err := NewManager(context.Background(), map[string]config.Server{}, nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got := len(m.ListServerNames()); got != 0 {
+		t.Errorf("expected 0 servers, got %d", got)
 	}
 }
 

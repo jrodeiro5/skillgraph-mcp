@@ -107,14 +107,14 @@ func (g *Graph) FormatCompact() string {
 		if n.Description != "" {
 			desc = " - " + n.Description
 		}
-		sb.WriteString(fmt.Sprintf("- [%s] %s%s\n", n.Type, n.Name, desc))
+		fmt.Fprintf(&sb, "- [%s] %s%s\n", n.Type, n.Name, desc)
 	}
 
 	sb.WriteString("\nRelations:\n")
 	for _, e := range g.Edges {
 		srcNode, srcOk := g.Nodes[e.Source]
 		tgtNode, tgtOk := g.Nodes[e.Target]
-		
+
 		var srcName, tgtName string
 		if srcOk {
 			srcName = fmt.Sprintf("[%s] %s", srcNode.Type, srcNode.Name)
@@ -131,7 +131,7 @@ func (g *Graph) FormatCompact() string {
 		if e.Description != "" {
 			descPart = fmt.Sprintf(" (%s)", e.Description)
 		}
-		sb.WriteString(fmt.Sprintf("- %s -%s-> %s%s\n", srcName, e.Type, tgtName, descPart))
+		fmt.Fprintf(&sb, "- %s -%s-> %s%s\n", srcName, e.Type, tgtName, descPart)
 	}
 	return sb.String()
 }

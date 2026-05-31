@@ -1,6 +1,6 @@
 # Changelog
 
-## [Unreleased](https://github.com/jrodeiro5/skillgraph-mcp/compare/v0.1.0...HEAD)
+## [Unreleased](https://github.com/jrodeiro5/skillgraph-mcp/compare/v1.0.0...HEAD)
 
 
 ### Known Limitations
@@ -13,34 +13,30 @@
 * **execute_code:** capture stdout from `print()` calls as fallback when code returns `None` — agents no longer need to use `return` explicitly ([`internal/tools/execute_code.go`](internal/tools/execute_code.go))
 
 
+## [1.0.0](https://github.com/jrodeiro5/skillgraph-mcp/compare/v0.1.1...v1.0.0) (2026-05-29)
+
+
 ### Features
 
-* **refine:** integrate SkillOpt optimization loop and trajectory logging ([5d25898](https://github.com/jrodeiro5/skillgraph-mcp/commit/5d25898))
-* add `register_server` tool for hot-registration of MCP servers at runtime ([bdc564c](https://github.com/jrodeiro5/skillgraph-mcp/commit/bdc564c))
-* **refine:** add hold-out validation gate to SkillOpt loop ([71c11be](https://github.com/jrodeiro5/skillgraph-mcp/commit/71c11be))
-* **refine:** auto-rollback SkillOpt edits when error rate degrades ([f8923c0](https://github.com/jrodeiro5/skillgraph-mcp/commit/f8923c0))
-* **cli:** add `list-skills`, `validate`, and `doctor` subcommands ([639b79b](https://github.com/jrodeiro5/skillgraph-mcp/commit/639b79b))
-* **refine:** add retry with exponential backoff, concurrency cap, and startup jitter ([392ce90](https://github.com/jrodeiro5/skillgraph-mcp/commit/392ce90))
+* **cli:** default --lattice-dir to os.UserCacheDir (ADR-0002) ([59a64fd](https://github.com/jrodeiro5/skillgraph-mcp/commit/59a64fd85dcc340aa9ca044bb5634033b5023a47))
+* **security:** gate register_server to loopback HTTP (ADR-0001) ([027d762](https://github.com/jrodeiro5/skillgraph-mcp/commit/027d762cc9bf7d3c8503da817a7b4678f6b9708b))
 
 
 ### Bug Fixes
 
-* **security:** prevent path traversal in `read_lattice` prefix check ([4f69251](https://github.com/jrodeiro5/skillgraph-mcp/commit/4f69251))
-* **concurrency:** protect Manager read methods with RLock ([aeaa4dd](https://github.com/jrodeiro5/skillgraph-mcp/commit/aeaa4dd))
-* **bootstrap:** refine without README when no source is available ([bf28190](https://github.com/jrodeiro5/skillgraph-mcp/commit/bf28190))
+* **execute_code:** write trajectory synchronously to drop t.TempDir race ([c954726](https://github.com/jrodeiro5/skillgraph-mcp/commit/c9547266282f0b66d0f392591686fdfd3f522809))
 
 
-### Refactoring
+### Documentation
 
-* harden module, providers, and tooling across the board ([8304932](https://github.com/jrodeiro5/skillgraph-mcp/commit/8304932))
+* **readme:** document API stability surface for v1.0 ([8d8bf0e](https://github.com/jrodeiro5/skillgraph-mcp/commit/8d8bf0ee4712cbad57ac264ec68927ed6bda4059))
+
+## [0.1.1](https://github.com/jrodeiro5/skillgraph-mcp/compare/v0.1.0...v0.1.1) (2026-05-29)
 
 
-### Chores
+### Bug Fixes
 
-* rename project from skillful-mcp to skillgraph-mcp throughout ([2257d49](https://github.com/jrodeiro5/skillgraph-mcp/commit/2257d49))
-* fix binary name in `.gitignore` (skillful-mcp → skillgraph-mcp) ([ec49dfd](https://github.com/jrodeiro5/skillgraph-mcp/commit/ec49dfd))
-* update default LLM models to current versions ([5b6bebc](https://github.com/jrodeiro5/skillgraph-mcp/commit/5b6bebc))
-
+* **mcpserver:** sanitize tool names for execute_code Python sandbox ([3ff6ff2](https://github.com/jrodeiro5/skillgraph-mcp/commit/3ff6ff2cdaa6214235a91f314284d5fdb31f78a8))
 
 ## [0.1.0](https://github.com/kurtisvg/skillful-mcp/compare/v0.0.1...v0.1.0) (2026-04-06)
 

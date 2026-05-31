@@ -49,7 +49,7 @@ func TestCallDeepSeek(t *testing.T) {
 				},
 			},
 		}
-		json.NewEncoder(w).Encode(resp)
+		_ = json.NewEncoder(w).Encode(resp)
 	}))
 	defer mockServer.Close()
 
@@ -86,7 +86,7 @@ func TestCallGemini(t *testing.T) {
 				},
 			},
 		}
-		json.NewEncoder(w).Encode(resp)
+		_ = json.NewEncoder(w).Encode(resp)
 	}))
 	defer mockServer.Close()
 
@@ -218,7 +218,7 @@ func TestRefineServerExecution(t *testing.T) {
 				},
 			},
 		}
-		json.NewEncoder(w).Encode(resp)
+		_ = json.NewEncoder(w).Encode(resp)
 	}))
 	defer mockServer.Close()
 
@@ -325,6 +325,10 @@ func TestOptimizeTracesSkipsLLMWhenNoErrors(t *testing.T) {
 }
 
 func TestCallOpenAICompat(t *testing.T) {
+	// Isolate from any LLM_BASE_URL the shell might have set (e.g. Mistral / Ollama)
+	// — the function reads it at call time and would bypass the mock server.
+	t.Setenv("LLM_BASE_URL", "")
+	t.Setenv("LLM_MODEL", "")
 	var gotModel string
 	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Header.Get("Authorization") != "Bearer oai-test-key" {
@@ -341,7 +345,7 @@ func TestCallOpenAICompat(t *testing.T) {
 				{"message": map[string]string{"content": `{"status": "openai-ok"}`}},
 			},
 		}
-		json.NewEncoder(w).Encode(resp)
+		_ = json.NewEncoder(w).Encode(resp)
 	}))
 	defer mockServer.Close()
 
@@ -362,6 +366,8 @@ func TestCallOpenAICompat(t *testing.T) {
 }
 
 func TestCallOpenAICompatNoKey(t *testing.T) {
+	t.Setenv("LLM_BASE_URL", "")
+	t.Setenv("LLM_MODEL", "")
 	// Local models (Ollama) may not require an API key — no Authorization header should be sent.
 	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Header.Get("Authorization") != "" {
@@ -373,7 +379,7 @@ func TestCallOpenAICompatNoKey(t *testing.T) {
 				{"message": map[string]string{"content": `{"ok":true}`}},
 			},
 		}
-		json.NewEncoder(w).Encode(resp)
+		_ = json.NewEncoder(w).Encode(resp)
 	}))
 	defer mockServer.Close()
 
@@ -445,7 +451,7 @@ func TestSnapshotCreatedBeforeEdit(t *testing.T) {
 
 	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]any{
+		_ = json.NewEncoder(w).Encode(map[string]any{
 			"choices": []map[string]any{
 				{"message": map[string]string{"content": `{"descriptions":{"tool_a":"improved"},"relations":[]}`}},
 			},
@@ -610,7 +616,7 @@ func TestOptimizeTracesExecution(t *testing.T) {
 				},
 			},
 		}
-		json.NewEncoder(w).Encode(resp)
+		_ = json.NewEncoder(w).Encode(resp)
 	}))
 	defer mockServer.Close()
 
@@ -783,7 +789,7 @@ func TestHoldoutGateFiltersRegressionInOptimize(t *testing.T) {
 	// LLM proposes a description that has zero overlap with the hold-out trace.
 	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]any{
+		_ = json.NewEncoder(w).Encode(map[string]any{
 			"choices": []map[string]any{
 				{"message": map[string]string{"content": `{"descriptions":{"tool_a":"processes unrelated data pipelines"},"relations":[]}`}},
 			},

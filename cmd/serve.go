@@ -31,7 +31,7 @@ func parseServeFlags(args []string) serveOptions {
 	var opts serveOptions
 	fs := flag.NewFlagSet("serve", flag.ExitOnError)
 	fs.StringVar(&opts.configPath, "config", "./mcp.json", "Path to MCP config file")
-	fs.StringVar(&opts.latticeDir, "lattice-dir", "./.mcp_lattice", "Directory for traces, READMEs, and lattice docs")
+	fs.StringVar(&opts.latticeDir, "lattice-dir", defaultLatticeDir(), "Directory for traces, READMEs, and lattice docs (default: user cache dir)")
 	fs.StringVar(&opts.transport, "transport", "stdio", "Upstream transport: stdio or http")
 	fs.StringVar(&opts.host, "host", "localhost", "HTTP host (when transport=http)")
 	fs.StringVar(&opts.port, "port", "8080", "HTTP port (when transport=http)")
@@ -86,7 +86,7 @@ func runServe(args []string) {
 
 	refine.StartRefinementLoop(ctx, opts.configPath, mgr, opts.latticeDir, servers)
 
-	s := app.NewServer(mgr, opts.latticeDir, opts.configPath)
+	s := app.NewServer(mgr, opts.latticeDir, opts.configPath, opts.transport, opts.host)
 	var serveErr error
 	switch opts.transport {
 	case "stdio":

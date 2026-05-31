@@ -42,7 +42,7 @@ func newPlanWorkflow(mgr *mcpserver.Manager) func(context.Context, *mcp.CallTool
 		}
 
 		var sb strings.Builder
-		sb.WriteString(fmt.Sprintf("Workflow plan for: %q\n\n", input.Goal))
+		fmt.Fprintf(&sb, "Workflow plan for: %q\n\n", input.Goal)
 
 		seen := make(map[string]bool)
 		for _, target := range targets {
@@ -54,15 +54,15 @@ func newPlanWorkflow(mgr *mcpserver.Manager) func(context.Context, *mcp.CallTool
 			chain := buildPrerequisiteChain(g, target.ID)
 			chain = append(chain, target)
 
-			sb.WriteString(fmt.Sprintf("## Path to %s\n", target.Name))
+			fmt.Fprintf(&sb, "## Path to %s\n", target.Name)
 			for i, node := range chain {
 				skill := findParentSkill(g, node.ID)
-				sb.WriteString(fmt.Sprintf("  %d. **%s**", i+1, node.Name))
+				fmt.Fprintf(&sb, "  %d. **%s**", i+1, node.Name)
 				if skill != nil {
-					sb.WriteString(fmt.Sprintf(" — via `use_skill(%q)`", skill.Name))
+					fmt.Fprintf(&sb, " — via `use_skill(%q)`", skill.Name)
 				}
 				if node.Description != "" {
-					sb.WriteString(fmt.Sprintf("\n     %s", node.Description))
+					fmt.Fprintf(&sb, "\n     %s", node.Description)
 				}
 				sb.WriteString("\n")
 			}

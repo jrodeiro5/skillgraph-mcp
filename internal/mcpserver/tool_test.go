@@ -450,3 +450,25 @@ func TestResolveToolsEmpty(t *testing.T) {
 		t.Errorf("expected empty, got %v", tools)
 	}
 }
+
+func TestPythonizeName(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		in, want string
+	}{
+		{"resolve-library-id", "resolve_library_id"},
+		{"query-docs", "query_docs"},
+		{"already_snake", "already_snake"},
+		{"camelCase", "camelCase"},
+		{"with.dots", "with_dots"},
+		{"with spaces", "with_spaces"},
+		{"3starts_with_digit", "_3starts_with_digit"},
+		{"trailing_-_chars", "trailing___chars"},
+		{"", "_"},
+	}
+	for _, tc := range tests {
+		if got := pythonizeName(tc.in); got != tc.want {
+			t.Errorf("pythonizeName(%q) = %q, want %q", tc.in, got, tc.want)
+		}
+	}
+}

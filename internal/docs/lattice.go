@@ -29,7 +29,7 @@ func GenerateLattice(ctx context.Context, dir string, cfgs map[string]config.Ser
 		if opts := srv.Options(); opts.Description != "" {
 			desc = opts.Description
 		}
-		skillsBuilder.WriteString(fmt.Sprintf("## %s\n", name))
+		fmt.Fprintf(&skillsBuilder, "## %s\n", name)
 		if desc != "" {
 			skillsBuilder.WriteString(desc + "\n\n")
 		} else {

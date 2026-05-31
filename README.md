@@ -5,33 +5,37 @@
 [![Go Report Card](https://goreportcard.com/badge/github.com/jrodeiro5/skillgraph-mcp)](https://goreportcard.com/report/github.com/jrodeiro5/skillgraph-mcp)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-Too many MCP tools slowing your agent down? Might be a Skill Issue 😉
+Too many MCP tools slowing your agent down? Might be a Skill Issue.
+
+> **Fork notice.** skillgraph-mcp builds on top of [kurtisvg/skillful-mcp](https://github.com/kurtisvg/skillful-mcp) by Kurtis Van Gent (MIT). This fork adds: a semantic skill graph + `plan_workflow` tool, a self-evolving description loop (SkillOpt), parallel downstream connection on startup, graceful degradation when individual downstreams fail, CLI subcommands (`doctor`, `validate`, `list-skills`), and Mistral as the recommended LLM provider.
 
 **skillgraph-mcp** eliminates tool bloat by building a semantic capability relationship graph and turning your MCP servers into Agent Skills in an MCP-native way.
 
-- 🔍 **Progressive Disclosure** — agent sees 7 lightweight tools; downstream schemas loaded on demand
-- ⚡ **Code Mode** — trigger and combine multiple tool calls with Python
-- 🔒 **Secure sandbox** — code executes in a sandbox, not your shell
-- 🔌 **Any MCP client** — works with Gemini CLI, Claude Code, Codex, and more
+- **Progressive Disclosure** — agent sees 8 lightweight tools; downstream schemas loaded on demand
+- **Code Mode** — trigger and combine multiple tool calls with Python
+- **Secure sandbox** — code executes in a sandbox, not your shell
+- **Any MCP client** — works with Gemini CLI, Claude Code, Codex, and more
 
 ## Table of contents
 
-- [Why?](#-why)
-- [How it works](#-how-it-works)
-- [Getting started](#-getting-started)
-- [Configuration](#-configuration)
-- [Embedding in Go](#-embedding-in-go)
-- [Gotchas](#️-gotchas)
-- [Troubleshooting](#-troubleshooting)
+- [Why?](#why)
+- [How it works](#how-it-works)
+  - [Self-evolving optimization (SkillOpt)](#self-evolving-optimization-skillopt)
+- [Getting started](#getting-started) — install, config, run, diagnostics
+- [Configuration](#configuration) — flags, server types, skill graph overrides
+- [Gotchas](#gotchas) — `--transport http`, `register_server`, blank child env
+- [Troubleshooting](#troubleshooting)
+- [Stability and versioning](#stability-and-versioning) — public API surface, semver promise
+- [Development](#development) — Makefile, MCP Inspector, local CI via act
 
-## ❓ Why?
+## Why?
 
 Connecting an agent to too many tools (or MCP servers) creates
 [tool bloat][tool-bloat]. An agent with access to 5 servers might have 80+ tools
 loaded into its context window before the user says a word. Accuracy drops,
 latency increases, and adding capabilities makes the agent worse.
 
-skillgraph-mcp fixes this through **progressive disclosure**. The agent sees 7
+skillgraph-mcp fixes this through **progressive disclosure**. The agent sees 8
 lightweight gateway tools and discovers specific downstream schemas on-demand,
 collapsing thousands of tokens down to a lightweight index.
 
@@ -39,7 +43,7 @@ collapsing thousands of tokens down to a lightweight index.
 
 [tool-bloat]: https://kvg.dev/posts/20260125-skills-and-mcp/
 
-## 💡 How it works
+## How it works
 
 ```mermaid
 flowchart LR
@@ -84,17 +88,18 @@ flowchart LR
 ```
 
 skillgraph-mcp reads a standard `mcp.json` config, connects to each downstream
-server, and exposes seven tools:
+server, and exposes eight tools:
 
-| Tool              | Description                                                                      |
-|-------------------|----------------------------------------------------------------------------------|
-| `list_skills`     | Returns the names of all configured downstream servers                           |
-| `use_skill`       | Lists the tools and resources available in a specific skill                      |
-| `read_resource`   | Reads a resource from a specific skill                                           |
-| `execute_code`    | Runs Python code in a secure [gomonty](https://github.com/ewhauser/gomonty) sandbox |
-| `get_skill_graph` | Returns the capability relationship graph                                        |
-| `plan_workflow`   | Receives a high-level goal and returns a recommended path of execution           |
-| `read_lattice`    | Reads files from the generated `.mcp_lattice` semantic documentation index       |
+| Tool               | Description                                                                      |
+|--------------------|----------------------------------------------------------------------------------|
+| `list_skills`      | Lists all configured skills with their descriptions                              |
+| `use_skill`        | Lists the tools and resources of a specific skill. Tool names match the function names available in `execute_code` (hyphens are sanitised to underscores). |
+| `read_resource`    | Reads a resource from a specific skill                                           |
+| `execute_code`     | Runs Python code in a secure [gomonty](https://github.com/ewhauser/gomonty) sandbox |
+| `register_server`  | Hot-registers a new downstream MCP server at runtime. **Warning:** see the security note under [Gotchas](#gotchas) before exposing this over HTTP. |
+| `get_skill_graph`  | Returns the capability relationship graph                                        |
+| `plan_workflow`    | Receives a high-level goal and returns a recommended path of execution           |
+| `read_lattice`     | Reads files from the generated `.mcp_lattice` semantic documentation index       |
 
 The typical agent workflow:
 
@@ -124,7 +129,7 @@ sequenceDiagram
     GW-->>A: computed result + trace written
 ```
 
-### 🔄 Self-Evolving Optimization (SkillOpt)
+### Self-evolving optimization (SkillOpt)
 
 `skillgraph-mcp` implements a self-evolving skill optimization mechanism inspired by Microsoft's **SkillOpt** framework (arXiv:2605.23904):
 * **Trajectory Logging:** When the agent runs Python code via `execute_code`, the gateway records execution trajectories (rollouts) including arguments, results, and runtime errors under `.mcp_lattice/traces/` (relative to the CWD where skillgraph-mcp is launched).
@@ -144,7 +149,10 @@ To enable the SkillOpt and bootstrap refinement loops, set one of these environm
 
 **Examples:**
 ```sh
-# Ollama (local, no auth)
+# Mistral (recommended — EU-hosted GDPR-friendly, 500k TPM free tier, OpenAI-compatible)
+LLM_BASE_URL=https://api.mistral.ai/v1 LLM_API_KEY=$MISTRAL_API_KEY LLM_MODEL=mistral-small-latest skillgraph-mcp --config mcp.json
+
+# Ollama (local, no auth, no data leaves the machine)
 LLM_BASE_URL=http://localhost:11434/v1 LLM_MODEL=llama3.1 skillgraph-mcp --config mcp.json
 
 # LiteLLM proxy (routes to any backend)
@@ -154,8 +162,10 @@ LLM_BASE_URL=http://localhost:4000 LLM_API_KEY=sk-... LLM_MODEL=anthropic/claude
 OPENAI_API_KEY=sk-... skillgraph-mcp --config mcp.json
 ```
 
+**Warning — privacy:** SkillOpt sends execution trajectories (Python code, tool arguments, errors) to the configured LLM provider. If any downstream tool receives secrets as arguments — API keys, tokens, passwords — those values **will be in the prompts sent to the LLM**. Run with a local model (Ollama, vLLM) or no LLM at all if your traces may contain sensitive data.
 
-### Example Code Mode Usage
+
+### Example code mode usage
 
 After discovering tools via `use_skill`, the agent can call them directly by
 name inside `execute_code` — chaining outputs from one tool into another:
@@ -173,7 +183,7 @@ arguments. If two skills define a tool with the same name, the function is
 prefixed with the skill name (e.g. `database_search`, `docs_search`). Tool
 names returned by `use_skill` always match the function names in `execute_code`.
 
-## 🚀 Getting started
+## Getting started
 
 ### Install
 
@@ -263,6 +273,18 @@ Or over HTTP:
 ```sh
 skillgraph-mcp --config mcp.json --transport http --port 8080
 ```
+
+#### Diagnostics & pre-flight
+
+Before wiring the gateway into your agent it's worth checking that the environment is healthy and every downstream server actually starts. The binary ships with three read-only subcommands for this:
+
+```sh
+skillgraph-mcp doctor       --config mcp.json   # binary, config, lattice dir, LLM provider, runtime
+skillgraph-mcp validate     --config mcp.json   # connect to every downstream in parallel, table of status + tool count
+skillgraph-mcp list-skills  --config mcp.json   # connect + dump skill | tools | description
+```
+
+All three accept `--json` for machine-readable output. `validate` exits non-zero when any server fails to connect, so it works as a pre-commit / CI check.
 
 ### Connect to your agent
 
@@ -355,7 +377,7 @@ specific capability.
 }
 ```
 
-## 📝 Configuration
+## Configuration
 
 Each entry in `mcpServers` is a downstream server that becomes a skill. The key
 is the skill name. The value depends on the transport type.
@@ -497,49 +519,7 @@ Manual `relations` entries are merged on top of inferred ones.
 | `--port`          | `8080`           | HTTP listen port                      |
 | `--version`       |                  | Print version and exit                |
 
-## 🔌 Embedding in Go
-
-skillgraph-mcp can be used as a library inside a Go program without running the CLI binary. Import the internal packages directly:
-
-```go
-import (
-    "github.com/jrodeiro5/skillgraph-mcp/internal/config"
-    "github.com/jrodeiro5/skillgraph-mcp/internal/mcpserver"
-    "github.com/modelcontextprotocol/go-sdk/mcp"
-)
-
-// Load config and connect to downstream servers
-servers, graphCfg, err := config.Load("mcp.json")
-mgr, err := mcpserver.NewManager(ctx, servers, graphCfg)
-defer mgr.Close()
-
-// Inspect the graph
-graph := mgr.GetGraph()
-tools := mgr.AllTools()               // all resolved tools across all skills
-dbTools := mgr.ServerTools("postgres") // tools from one skill
-
-// Proxy a tool call directly
-srv, _ := mgr.GetServer("postgres")
-result, _ := srv.CallTool(ctx, &mcp.CallToolParams{
-    Name:      "query",
-    Arguments: map[string]any{"sql": "SELECT 1"},
-})
-
-// Rebuild graph after a config change
-mgr.RebuildGraph(updatedGraphCfg)
-```
-
-If you already have an `*mcp.ClientSession` (e.g. from your own transport), wrap it without going through the config file:
-
-```go
-srv, err := mcpserver.NewServerFromSession(ctx, session, config.ServerOptions{
-    Description:  "My custom skill",
-    AllowedTools: []string{"search", "create"},
-})
-mgr, err := mcpserver.NewManagerFromServers(map[string]*mcpserver.Server{"my-skill": srv})
-```
-
-## ⚠️ Gotchas
+## Gotchas
 
 **STDIO child processes get a blank environment.** When `command` servers are launched, they inherit only the variables explicitly listed in the `env` block — not the parent shell's environment. If a child process needs `PATH`, `HOME`, or any other system variable, you must pass it explicitly:
 
@@ -555,7 +535,11 @@ mgr, err := mcpserver.NewManagerFromServers(map[string]*mcpserver.Server{"my-ski
 
 **`mcp.json` is mutated at runtime.** The `skillGraph` section (descriptions and relations) is auto-populated and updated by the background refinement loops. Keep a copy if you want to preserve a known-good baseline, or use git to track changes.
 
-## 🔧 Troubleshooting
+**`register_server` over `--transport http` is RCE-by-design.** The `register_server` gateway tool lets any MCP client write a new entry to `mcp.json` — including a `command` field that the gateway will then `exec`. Combined with `--transport http` (which exposes the MCP protocol over an unauthenticated HTTP endpoint), **anyone who can reach the port can register and run arbitrary processes as the gateway's user**. Stick to `--transport stdio` unless you have an authenticating reverse proxy in front, and prefer to keep `register_server` off the allow-list for HTTP deployments.
+
+**`--transport http` has no authentication.** The HTTP transport speaks raw MCP JSON-RPC with no token, header, or origin check. Treat it as `127.0.0.1`-only by default; if you need to expose it, put it behind an auth proxy (caddy, nginx, oauth2-proxy, Cloudflare Access, etc.).
+
+## Troubleshooting
 
 **SkillOpt loop never runs** — Check that an LLM env var is set (`LLM_BASE_URL`, `OPENAI_API_KEY`, `DEEPSEEK_API_KEY`, or `GEMINI_API_KEY`). Without one, both background loops are skipped silently on startup.
 
@@ -565,18 +549,65 @@ mgr, err := mcpserver.NewManagerFromServers(map[string]*mcpserver.Server{"my-ski
 
 **Graph not updating after config edit** — The graph is loaded once at startup. Restart skillgraph-mcp to pick up manual edits to `mcp.json`'s `skillGraph` section.
 
-**Startup hangs / 60-second timeout** — Remote HTTP servers (`type: http`) and OAuth-based `mcp-remote` servers block skillgraph's MCP handshake until every downstream connection is established. If any remote server is slow or requires interactive OAuth (e.g. `mcp-remote` pointing at a Google API endpoint), skillgraph will hang for the full connection timeout before Claude Code marks it as failed. Move remote HTTP servers to Claude Code's own MCP config instead, or remove them from `mcp.json` entirely.
+**MCP client reports "connection timed out after 30000ms"** — Cold start of the gateway scales with the slowest downstream. The gateway connects all of them in parallel at startup, but if a single server hangs on `initialize` it can push past your client's timeout. Run `skillgraph-mcp validate --config mcp.json --timeout 25` to see exactly which one is slow; if it's a `npx` server doing a first-time download, run it once standalone to warm the npm cache.
+
+**One downstream fails, can I still use the rest?** — Yes. As of v0.1.0+, a failed `NewServer` call is logged as a warning and that server is skipped; the gateway comes up with whatever connected. The MCP-level error only surfaces when *every* configured server fails. Use `validate` to see per-server status.
+
+**Hyphenated tool names not callable from `execute_code`** — Tool names from downstream MCPs may contain hyphens (e.g. context7's `resolve-library-id`). Python identifiers can't contain hyphens, so the gateway sanitises them to underscores (`resolve_library_id`) when registering into the sandbox. `use_skill` shows the sanitised name; call it that way in `execute_code`. The wire call to the downstream server still uses the original hyphenated name.
+
+**Startup hangs with remote HTTP or OAuth servers** — Remote HTTP servers (`type: http`) and OAuth-gated `mcp-remote` servers block the gateway's MCP handshake until their connection is established. If a server requires interactive OAuth (e.g. `mcp-remote` pointing at a Google API endpoint), the gateway will hang for the full connection timeout. Move remote HTTP servers to your MCP client config instead, or remove them from `mcp.json` entirely.
 
 **Unwanted MCP servers from your claude.ai account** — Claude Code syncs MCP servers configured in your claude.ai web settings by default. To suppress them, set `ENABLE_CLAUDEAI_MCP_SERVERS=false` in your environment or in `~/.claude/settings.json` under `env`.
 
-**`execute_code` prefers `return` over `print`** — The sandbox surfaces the return value of your code. Both work, but `return result` is clearer and guaranteed to be the primary output. When code returns `None` (no explicit `return`), skillgraph falls back to any captured stdout — so `print()` still works as a secondary path.
+**`execute_code` prefers `return` over `print`** — The sandbox surfaces the return value of your code. Both work: when code returns `None` (no explicit `return`), skillgraph falls back to captured stdout. But `return result` is clearer and guaranteed to be the primary output.
 
 ```python
 # ✅ Preferred
 result = my_tool(arg="value")
 return result
 
-# ✅ Also works (fallback path)
+# ✅ Also works (stdout fallback)
 result = my_tool(arg="value")
 print(result)
 ```
+
+## Stability and versioning
+
+skillgraph-mcp follows [semantic versioning](https://semver.org/) from v1.0 onwards. The public API surface is fixed and documented in [ADR-0003](docs/adr/0003-versioning-and-public-api-surface.md):
+
+- The `mcp.json` schema (server entries, `skillGraph` overrides, `${VAR}` interpolation).
+- The CLI flags and subcommands listed under [Flags](#flags) and [Diagnostics & pre-flight](#diagnostics--pre-flight).
+- The eight gateway tool names and their JSON input schemas.
+- The file formats inside `.mcp_lattice/` (`traces/*.json`, `skills.md`, `relations.md`, `history/*.json`).
+
+Breaking changes to any of the above require a major version bump. Adding tools, flags, or fields is a minor bump. Bug fixes and internal refactors are patches.
+
+The following are **not** part of the public API and may change in any release: anything under `internal/`, the LLM prompt text used by SkillOpt and the bootstrap loops, log format and slog field names, the directory layout inside `~/.cache/skillgraph-mcp/` beyond the documented filenames, and the Docker image's internal filesystem layout.
+
+## Development
+
+### Makefile targets
+
+| Target | Purpose |
+|---|---|
+| `make build` | Compile the binary in the project root |
+| `make test` | Run `go test ./...` with a 120 s timeout |
+| `make lint` | Run `golangci-lint` |
+| `make install` | Build and install to `~/.local/bin/skillgraph-mcp` |
+| `make inspect` | Launch the official [MCP Inspector](https://github.com/modelcontextprotocol/inspector) against the installed gateway with `CONFIG=...` |
+| `make inspect-downstream CMD="..."` | Same, but against a single downstream MCP in isolation — useful when the gateway is masking a downstream issue |
+| `make ci` / `make ci-release` | Run the GitHub Actions workflows locally via [act](https://github.com/nektos/act) |
+
+### Local CI via act
+
+The GitHub Actions workflows in `.github/workflows/` can be run locally before pushing using [nektos/act](https://github.com/nektos/act). This catches workflow regressions that would otherwise only surface after `git push` + waiting for CI.
+
+Requires Docker. First run pulls a ~600 MB runner image; subsequent runs are cached. `GITHUB_TOKEN` must be exported (act uses it to clone actions from `uses:`).
+
+```sh
+go install github.com/nektos/act@latest    # one-time
+make ci                                    # runs .github/workflows/test.yml
+make ci-release TAG=v0.1.1                 # simulates release dispatch
+```
+
+Runner image and arch are pinned in `.actrc`. Use this before pushing changes that touch workflows or build scripts.

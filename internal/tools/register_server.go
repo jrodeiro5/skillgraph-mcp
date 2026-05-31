@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net"
 
 	"github.com/jrodeiro5/skillgraph-mcp/internal/config"
 	"github.com/jrodeiro5/skillgraph-mcp/internal/mcpserver"
@@ -16,7 +17,15 @@ type registerServerInput struct {
 	Config json.RawMessage `json:"config"`
 }
 
-func RegisterRegisterServer(s *mcp.Server, mgr *mcpserver.Manager, configPath string) {
+// GatewayBinding describes the transport and host the gateway itself is
+// serving on. Used by register_server to gate registration when the gateway
+// is exposed on a non-loopback HTTP address (see ADR-0001).
+type GatewayBinding struct {
+	Transport string
+	Host      string
+}
+
+func RegisterRegisterServer(s *mcp.Server, mgr *mcpserver.Manager, configPath string, binding GatewayBinding) {
 	mcp.AddTool(
 		s,
 		&mcp.Tool{
@@ -25,12 +34,24 @@ func RegisterRegisterServer(s *mcp.Server, mgr *mcpserver.Manager, configPath st
 				"Provide a server name and a config block identical to an mcpServers entry in mcp.json. " +
 				"The server is connected immediately and its tools become available via use_skill.",
 		},
-		newRegisterServer(mgr, configPath),
+		newRegisterServer(mgr, configPath, binding),
 	)
 }
 
-func newRegisterServer(mgr *mcpserver.Manager, configPath string) func(context.Context, *mcp.CallToolRequest, registerServerInput) (*mcp.CallToolResult, any, error) {
+func newRegisterServer(mgr *mcpserver.Manager, configPath string, binding GatewayBinding) func(context.Context, *mcp.CallToolRequest, registerServerInput) (*mcp.CallToolResult, any, error) {
 	return func(ctx context.Context, _ *mcp.CallToolRequest, input registerServerInput) (*mcp.CallToolResult, any, error) {
+		if binding.Transport == "http" && !isLoopbackHost(binding.Host) {
+			return &mcp.CallToolResult{
+				IsError: true,
+				Content: []mcp.Content{&mcp.TextContent{
+					Text: fmt.Sprintf(
+						"register_server refused: gateway is serving HTTP on non-loopback host %q; see docs/adr/0001-loopback-default-and-register-server-gate.md",
+						binding.Host,
+					),
+				}},
+			}, nil, nil
+		}
+
 		if input.Name == "" {
 			return nil, nil, fmt.Errorf("name is required")
 		}
@@ -68,4 +89,30 @@ func newRegisterServer(mgr *mcpserver.Manager, configPath string) func(context.C
 			}},
 		}, nil, nil
 	}
+}
+
+// isLoopbackHost reports whether host resolves exclusively to loopback
+// addresses (127.0.0.0/8 or ::1). An empty host is treated as loopback
+// (net.Listen on an empty host binds to all interfaces, but the gateway
+// flag defaults to "localhost" and we deny-by-default on resolution
+// failure rather than silently allowing). DNS resolution failures are
+// treated as non-loopback (deny by default).
+func isLoopbackHost(host string) bool {
+	if host == "" {
+		return false
+	}
+	if ip := net.ParseIP(host); ip != nil {
+		return ip.IsLoopback()
+	}
+	addrs, err := net.LookupHost(host)
+	if err != nil || len(addrs) == 0 {
+		return false
+	}
+	for _, a := range addrs {
+		ip := net.ParseIP(a)
+		if ip == nil || !ip.IsLoopback() {
+			return false
+		}
+	}
+	return true
 }

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"sort"
 	"strings"
 	"sync"
 
@@ -21,32 +22,69 @@ type Manager struct {
 }
 
 // NewManager creates a Manager by connecting to all servers in the config.
+// Downstream connections happen in parallel so total startup is O(slowest
+// server) instead of O(sum of servers) — important to stay under MCP client
+// initialize timeouts (Claude Code's is 30s).
 func NewManager(ctx context.Context, cfgs map[string]config.Server, graphCfg *config.SkillGraphConfig) (*Manager, error) {
 	m := &Manager{
 		servers: make(map[string]*Server),
 		graph:   graph.New(),
 	}
 
+	type connectResult struct {
+		name string
+		srv  config.Server
+		s    *Server
+		err  error
+	}
+
+	results := make(chan connectResult, len(cfgs))
 	for name, srv := range cfgs {
-		s, err := NewServer(ctx, srv)
-		if err != nil {
-			// Close any servers we already opened before returning.
-			m.Close()
-			return nil, fmt.Errorf("connecting to %q: %w", name, err)
+		go func(name string, srv config.Server) {
+			s, err := NewServer(ctx, srv)
+			results <- connectResult{name: name, srv: srv, s: s, err: err}
+		}(name, srv)
+	}
+
+	// Collect results in a deterministic order: by sorted name, so logs and
+	// the resulting graph are stable across runs.
+	pending := make(map[string]connectResult, len(cfgs))
+	for i := 0; i < len(cfgs); i++ {
+		r := <-results
+		pending[r.name] = r
+	}
+	names := make([]string, 0, len(pending))
+	for name := range pending {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+
+	for _, name := range names {
+		r := pending[name]
+		if r.err != nil {
+			// One bad downstream should not kill the entire gateway. Log and
+			// continue; the remaining servers will still be reachable. The
+			// agent can call `validate` to see per-server status.
+			slog.Warn("failed to connect to server, skipping", "server", name, "error", r.err)
+			continue
 		}
-		m.servers[name] = s
+		m.servers[name] = r.s
 		slog.Info("connected to server", "server", name)
 
 		// Add Skill Node
 		desc := ""
 		if graphCfg != nil && graphCfg.Descriptions[name] != "" {
 			desc = graphCfg.Descriptions[name]
-		} else if opts := srv.Options(); opts.Description != "" {
+		} else if opts := r.srv.Options(); opts.Description != "" {
 			desc = opts.Description
-		} else if s.Instructions() != "" {
-			desc = s.Instructions()
+		} else if r.s.Instructions() != "" {
+			desc = r.s.Instructions()
 		}
 		m.graph.AddNode(name, graph.NodeSkill, name, desc)
+	}
+
+	if len(cfgs) > 0 && len(m.servers) == 0 {
+		return nil, fmt.Errorf("no downstream servers could be reached (%d configured, all failed)", len(cfgs))
 	}
 
 	tools, err := resolveTools(m.servers)
@@ -224,14 +262,14 @@ func resolveTools(servers map[string]*Server) ([]Tool, error) {
 	var resolved []Tool
 	for name, entries := range byName {
 		if len(entries) == 1 {
-			t, err := newTool(name, name, entries[0].serverName, entries[0].tool)
+			t, err := newTool(pythonizeName(name), name, entries[0].serverName, entries[0].tool)
 			if err != nil {
 				return nil, err
 			}
 			resolved = append(resolved, t)
 		} else {
 			for _, e := range entries {
-				t, err := newTool(e.serverName+"_"+name, name, e.serverName, e.tool)
+				t, err := newTool(pythonizeName(e.serverName+"_"+name), name, e.serverName, e.tool)
 				if err != nil {
 					return nil, err
 				}
@@ -240,6 +278,37 @@ func resolveTools(servers map[string]*Server) ([]Tool, error) {
 		}
 	}
 	return resolved, nil
+}
+
+// pythonizeName converts an MCP tool name into a valid Python identifier so
+// the execute_code gomonty sandbox can resolve it (gomonty looks up function
+// names verbatim; "resolve-library-id" is not callable in Python). The
+// OriginalName field on Tool keeps the wire-format name used when calling
+// downstream MCP servers, so this rewrite is purely a sandbox-facing concern.
+//
+// Replaces any character outside [A-Za-z0-9_] with '_'. If the first
+// character is a digit, an underscore is prepended so the result is a legal
+// identifier start.
+func pythonizeName(s string) string {
+	if s == "" {
+		return "_"
+	}
+	out := make([]byte, 0, len(s))
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+		switch {
+		case c >= 'a' && c <= 'z',
+			c >= 'A' && c <= 'Z',
+			c == '_',
+			c >= '0' && c <= '9' && i > 0:
+			out = append(out, c)
+		case c >= '0' && c <= '9':
+			out = append(out, '_', c)
+		default:
+			out = append(out, '_')
+		}
+	}
+	return string(out)
 }
 
 func (m *Manager) GetServer(name string) (*Server, error) {

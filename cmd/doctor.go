@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
@@ -22,20 +23,23 @@ type checkResult struct {
 
 func runDoctor(args []string) {
 	var (
-		configPath string
-		latticeDir string
-		jsonOut    bool
+		configPath  string
+		latticeDir  string
+		jsonOut     bool
+		skipNetwork bool
 	)
 	fs := flag.NewFlagSet("doctor", flag.ExitOnError)
 	fs.StringVar(&configPath, "config", "./mcp.json", "Path to MCP config file")
 	fs.StringVar(&latticeDir, "lattice-dir", defaultLatticeDir(), "Directory for traces and lattice docs (default: user cache dir)")
 	fs.BoolVar(&jsonOut, "json", false, "Emit JSON instead of a checklist")
+	fs.BoolVar(&skipNetwork, "skip-network", false, "Skip the GitHub Releases check (offline-safe)")
 	if err := fs.Parse(args); err != nil {
 		os.Exit(2)
 	}
 
 	checks := []checkResult{
 		checkVersion(),
+		checkLatestVersion(skipNetwork),
 		checkConfig(configPath),
 		checkLatticeDir(latticeDir),
 		checkLLMProvider(),
@@ -84,6 +88,33 @@ func statusIcon(s string) string {
 
 func checkVersion() checkResult {
 	return checkResult{Name: "binary version", Status: "ok", Detail: version.Version}
+}
+
+// checkLatestVersion queries the GitHub Releases API and compares the latest
+// published tag against the running binary. Best-effort: any failure (offline,
+// rate limit, parse) downgrades to a "warn" with the reason — doctor must not
+// fail just because the user is offline. Returns "ok" for up-to-date or
+// ahead-of-release (dev builds), "warn" for available updates.
+func checkLatestVersion(skipNetwork bool) checkResult {
+	if skipNetwork {
+		return checkResult{Name: "latest release", Status: "ok", Detail: "skipped (--skip-network)"}
+	}
+	latest, err := version.FetchLatestTag(context.Background())
+	if err != nil {
+		return checkResult{Name: "latest release", Status: "warn", Detail: "cannot reach GitHub releases — skipping (offline?): " + err.Error()}
+	}
+	cmp, err := version.Compare(version.Version, latest)
+	if err != nil {
+		return checkResult{Name: "latest release", Status: "warn", Detail: fmt.Sprintf("cannot compare %q vs %q: %v", version.Version, latest, err)}
+	}
+	switch {
+	case cmp < 0:
+		return checkResult{Name: "latest release", Status: "warn", Detail: fmt.Sprintf("v%s available (current: v%s) — see https://github.com/jrodeiro5/skillgraph-mcp/releases/latest", latest, version.Version)}
+	case cmp > 0:
+		return checkResult{Name: "latest release", Status: "ok", Detail: fmt.Sprintf("v%s (ahead of latest published v%s — dev or pre-release build)", version.Version, latest)}
+	default:
+		return checkResult{Name: "latest release", Status: "ok", Detail: fmt.Sprintf("v%s (up to date)", version.Version)}
+	}
 }
 
 func checkConfig(path string) checkResult {

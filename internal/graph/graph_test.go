@@ -53,3 +53,27 @@ func TestGraphOperations(t *testing.T) {
 		t.Errorf("Expected format to contain relation details")
 	}
 }
+
+// TestFormatCompactCollapsesMultilineDescriptions verifies that descriptions
+// containing embedded JSON examples or other multi-line content render on a
+// single line. Regression for the lattice.md "corruption" investigation where
+// firecrawl tool descriptions leaked their JSON braces onto their own lines.
+func TestFormatCompactCollapsesMultilineDescriptions(t *testing.T) {
+	t.Parallel()
+	g := New()
+	g.AddNode("firecrawl_feedback", NodeTool, "firecrawl_feedback",
+		"Submit feedback.\n\n**Usage Example:**\n```json\n{\n  \"rating\": \"good\"\n}\n```")
+	g.AddEdge("a", "firecrawl_feedback", RelPrerequisiteFor, "after search\nbefore close")
+	g.AddNode("a", NodeTool, "a", "")
+
+	out := g.FormatCompact()
+	for _, line := range strings.Split(out, "\n") {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "{" || trimmed == "}" || trimmed == "```" || trimmed == "```json" {
+			t.Errorf("FormatCompact leaked a raw delimiter line: %q\nfull:\n%s", trimmed, out)
+		}
+	}
+	if !strings.Contains(out, "Submit feedback. **Usage Example:** ```json {") {
+		t.Errorf("expected multi-line description collapsed to single line, got:\n%s", out)
+	}
+}

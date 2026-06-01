@@ -102,8 +102,14 @@ func FetchReadme(ctx context.Context, rawURL, outputPath string) error {
 }
 
 // FetchNPMReadme fetches the README of an NPM package and saves it to outputPath.
+//
+// Uses the package document URL (https://registry.npmjs.org/<pkg>) rather than
+// the version document (https://registry.npmjs.org/<pkg>/latest). The README
+// only lives on the package document; the version document is just the
+// package.json contents and never has a readme field, which silently produced
+// .noreadme sentinels for every package the bootstrap touched.
 func FetchNPMReadme(ctx context.Context, packageName, outputPath string) error {
-	reqURL := fmt.Sprintf("https://registry.npmjs.org/%s/latest", packageName)
+	reqURL := fmt.Sprintf("https://registry.npmjs.org/%s", packageName)
 	req, err := http.NewRequestWithContext(ctx, "GET", reqURL, nil)
 	if err != nil {
 		return err

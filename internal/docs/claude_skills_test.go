@@ -26,8 +26,12 @@ func TestGenerateClaudeSkills(t *testing.T) {
 	g.AddEdge("gitnexus", "query", graph.RelHasTool, "")
 	g.AddEdge("gitnexus", "context", graph.RelHasTool, "")
 
-	if err := GenerateClaudeSkills(dir, cfgs, g, ClaudeSkillsOptions{ConfigPath: "/tmp/mcp.json"}); err != nil {
+	res, err := GenerateClaudeSkills(dir, cfgs, g, ClaudeSkillsOptions{ConfigPath: "/tmp/mcp.json"})
+	if err != nil {
 		t.Fatal(err)
+	}
+	if len(res.Written) != 2 {
+		t.Errorf("expected 2 written, got %d (skipped %v)", len(res.Written), res.Skipped)
 	}
 
 	// gitnexus: full content with tools
@@ -67,7 +71,7 @@ func TestGenerateClaudeSkillsCustomBinary(t *testing.T) {
 		"x": &config.StdioServer{Type: "stdio", Command: "x"},
 	}
 	opts := ClaudeSkillsOptions{BinaryPath: "/opt/bin/skillgraph-mcp", ConfigPath: "/etc/mcp.json"}
-	if err := GenerateClaudeSkills(dir, cfgs, nil, opts); err != nil {
+	if _, err := GenerateClaudeSkills(dir, cfgs, nil, opts); err != nil {
 		t.Fatal(err)
 	}
 	data, err := os.ReadFile(filepath.Join(dir, "x", "SKILL.md"))
@@ -91,7 +95,8 @@ func TestGenerateClaudeSkillsRejectsUnsafeName(t *testing.T) {
 		"":          &config.StdioServer{Type: "stdio", Command: "x"},
 		"ok":        &config.StdioServer{Type: "stdio", Command: "x"},
 	}
-	if err := GenerateClaudeSkills(dir, cfgs, nil, ClaudeSkillsOptions{}); err != nil {
+	res, err := GenerateClaudeSkills(dir, cfgs, nil, ClaudeSkillsOptions{})
+	if err != nil {
 		t.Fatal(err)
 	}
 	// Only "ok" should have been written.
@@ -102,6 +107,12 @@ func TestGenerateClaudeSkillsRejectsUnsafeName(t *testing.T) {
 	if len(entries) != 1 || entries[0].Name() != "ok" {
 		t.Errorf("expected only 'ok' dir, got %v", entries)
 	}
+	if len(res.Written) != 1 || res.Written[0] != "ok" {
+		t.Errorf("expected Written=[ok], got %v", res.Written)
+	}
+	if len(res.Skipped) != 2 {
+		t.Errorf("expected 2 skipped (unsafe names), got %v", res.Skipped)
+	}
 }
 
 func TestGenerateClaudeSkillsIdempotent(t *testing.T) {
@@ -111,7 +122,7 @@ func TestGenerateClaudeSkillsIdempotent(t *testing.T) {
 		"a": &config.StdioServer{Type: "stdio", Command: "x"},
 	}
 	for i := 0; i < 3; i++ {
-		if err := GenerateClaudeSkills(dir, cfgs, nil, ClaudeSkillsOptions{}); err != nil {
+		if _, err := GenerateClaudeSkills(dir, cfgs, nil, ClaudeSkillsOptions{Force: true}); err != nil {
 			t.Fatalf("run %d: %v", i, err)
 		}
 	}
@@ -121,6 +132,111 @@ func TestGenerateClaudeSkillsIdempotent(t *testing.T) {
 		if strings.Contains(e.Name(), ".tmp-") {
 			t.Errorf("leftover temp file: %s", e.Name())
 		}
+	}
+}
+
+// TestGenerateClaudeSkillsRefusesOverwrite verifies the default (Force=false)
+// path skips skills with an existing SKILL.md instead of clobbering it. This is
+// the gitnexus-style case: a user's curated SKILL.md must survive a re-run.
+func TestGenerateClaudeSkillsRefusesOverwrite(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	cfgs := map[string]config.Server{
+		"gitnexus": &config.StdioServer{Type: "stdio", Command: "gitnexus"},
+	}
+
+	preexisting := []byte("# Hand-curated SKILL.md\n")
+	if err := os.MkdirAll(filepath.Join(dir, "gitnexus"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "gitnexus", "SKILL.md"), preexisting, 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	res, err := GenerateClaudeSkills(dir, cfgs, nil, ClaudeSkillsOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(res.Written) != 0 {
+		t.Errorf("expected 0 written, got %v", res.Written)
+	}
+	if len(res.Skipped) != 1 || !strings.Contains(res.Skipped[0], "gitnexus") {
+		t.Errorf("expected gitnexus in Skipped, got %v", res.Skipped)
+	}
+
+	got, _ := os.ReadFile(filepath.Join(dir, "gitnexus", "SKILL.md"))
+	if string(got) != string(preexisting) {
+		t.Errorf("existing SKILL.md was overwritten: %q", got)
+	}
+}
+
+// TestGenerateClaudeSkillsForceOverwrite verifies --force/Force=true actually
+// overwrites pre-existing files.
+func TestGenerateClaudeSkillsForceOverwrite(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	cfgs := map[string]config.Server{
+		"x": &config.StdioServer{Type: "stdio", Command: "x"},
+	}
+	if err := os.MkdirAll(filepath.Join(dir, "x"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "x", "SKILL.md"), []byte("old"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	res, err := GenerateClaudeSkills(dir, cfgs, nil, ClaudeSkillsOptions{Force: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(res.Written) != 1 {
+		t.Errorf("expected 1 written, got %v", res.Written)
+	}
+	got, _ := os.ReadFile(filepath.Join(dir, "x", "SKILL.md"))
+	if string(got) == "old" {
+		t.Error("force=true did not overwrite")
+	}
+}
+
+// TestGenerateClaudeSkillsSkipsSymlinkedDir protects centralized hub setups
+// where ~/.claude/skills/<name> is a symlink to a separate skills repo. Without
+// Force, the generator must not follow the symlink and write into the hub.
+func TestGenerateClaudeSkillsSkipsSymlinkedDir(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	hubDir := t.TempDir() // simulates the centralized skills hub
+
+	hubGitnexus := filepath.Join(hubDir, "gitnexus")
+	if err := os.MkdirAll(hubGitnexus, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	hubSkill := filepath.Join(hubGitnexus, "SKILL.md")
+	if err := os.WriteFile(hubSkill, []byte("# Hub-managed\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	linkPath := filepath.Join(dir, "gitnexus")
+	if err := os.Symlink(hubGitnexus, linkPath); err != nil {
+		t.Fatal(err)
+	}
+
+	cfgs := map[string]config.Server{
+		"gitnexus": &config.StdioServer{Type: "stdio", Command: "gitnexus"},
+	}
+
+	res, err := GenerateClaudeSkills(dir, cfgs, nil, ClaudeSkillsOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(res.Written) != 0 {
+		t.Errorf("expected 0 written, got %v", res.Written)
+	}
+	if len(res.Skipped) != 1 {
+		t.Errorf("expected 1 skipped, got %v", res.Skipped)
+	}
+	got, _ := os.ReadFile(hubSkill)
+	if string(got) != "# Hub-managed\n" {
+		t.Errorf("hub SKILL.md was modified: %q", got)
 	}
 }
 

@@ -21,6 +21,7 @@ func runGenerateSkills(args []string) {
 		binaryPath string
 		timeoutSec int
 		offline    bool
+		force      bool
 	)
 	fs := flag.NewFlagSet("generate-skills", flag.ExitOnError)
 	fs.StringVar(&configPath, "config", "./mcp.json", "Path to MCP config file")
@@ -28,6 +29,7 @@ func runGenerateSkills(args []string) {
 	fs.StringVar(&binaryPath, "binary", "skillgraph-mcp", "Binary path used in SKILL.md preflight blocks (defaults to PATH lookup)")
 	fs.IntVar(&timeoutSec, "timeout", 30, "Connection timeout when --offline=false")
 	fs.BoolVar(&offline, "offline", false, "Skip connecting to downstreams; generate from config alone (no tool listing)")
+	fs.BoolVar(&force, "force", false, "Overwrite existing SKILL.md files (default: skip)")
 	if err := fs.Parse(args); err != nil {
 		os.Exit(2)
 	}
@@ -46,14 +48,16 @@ func runGenerateSkills(args []string) {
 	opts := docs.ClaudeSkillsOptions{
 		BinaryPath: binaryPath,
 		ConfigPath: absConfig,
+		Force:      force,
 	}
 
 	if offline {
-		if err := docs.GenerateClaudeSkills(outDir, servers, nil, opts); err != nil {
+		res, err := docs.GenerateClaudeSkills(outDir, servers, nil, opts)
+		if err != nil {
 			fmt.Fprintf(os.Stderr, "generate failed: %v\n", err)
 			os.Exit(1)
 		}
-		fmt.Printf("Wrote %d skill files to %s (offline mode — no tool listings).\n", len(servers), outDir)
+		reportGenerateResult(res, outDir, true)
 		return
 	}
 
@@ -67,20 +71,31 @@ func runGenerateSkills(args []string) {
 	}
 	defer mgr.Close()
 
-	if err := docs.GenerateClaudeSkills(outDir, servers, mgr.GetGraph(), opts); err != nil {
+	res, err := docs.GenerateClaudeSkills(outDir, servers, mgr.GetGraph(), opts)
+	if err != nil {
 		fmt.Fprintf(os.Stderr, "generate failed: %v\n", err)
 		os.Exit(1)
 	}
-	fmt.Printf("Wrote skill files for %d connected skills to %s.\n", len(mgr.ListServerNames()), outDir)
+	reportGenerateResult(res, outDir, false)
 }
 
-// defaultClaudeSkillsDir resolves ~/.claude/skills (per the Claude Code Skills
-// docs — personal skills location). Falls back to the CWD-relative
-// .claude/skills if $HOME is unset.
-func defaultClaudeSkillsDir() string {
-	home, err := os.UserHomeDir()
-	if err != nil || home == "" {
-		return filepath.Join(".claude", "skills")
+func reportGenerateResult(res docs.GenerateResult, outDir string, offline bool) {
+	tag := ""
+	if offline {
+		tag = " (offline mode — no tool listings)"
 	}
-	return filepath.Join(home, ".claude", "skills")
+	fmt.Printf("Wrote %d skill files to %s%s.\n", len(res.Written), outDir, tag)
+	if len(res.Skipped) > 0 {
+		fmt.Printf("Skipped %d (use --force to overwrite):\n", len(res.Skipped))
+		for _, s := range res.Skipped {
+			fmt.Printf("  - %s\n", s)
+		}
+	}
+}
+
+// defaultClaudeSkillsDir resolves .claude/skills relative to the CWD — the
+// recommended per-project location for Claude Code skills. Users who maintain
+// a centralized skills hub can opt in with `--out ~/.claude/skills` explicitly.
+func defaultClaudeSkillsDir() string {
+	return filepath.Join(".claude", "skills")
 }

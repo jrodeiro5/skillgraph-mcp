@@ -13,6 +13,8 @@ Usage:
   skillgraph-mcp [serve]              Run the gateway (default).
   skillgraph-mcp list-skills          List configured skills and their tools.
   skillgraph-mcp validate             Connect to every downstream server and report failures.
+  skillgraph-mcp probe <skill>        Health-probe a single downstream skill (for SKILL.md preflight).
+  skillgraph-mcp generate-skills      Generate Claude Code SKILL.md files for each downstream skill.
   skillgraph-mcp doctor               Diagnose the local environment.
   skillgraph-mcp --version            Print version and exit.
   skillgraph-mcp --help               Show this help.
@@ -52,6 +54,10 @@ func Execute() {
 		runListSkills(rest)
 	case "validate":
 		runValidate(rest)
+	case "probe":
+		runProbe(rest)
+	case "generate-skills":
+		runGenerateSkills(rest)
 	case "doctor":
 		runDoctor(rest)
 	default:

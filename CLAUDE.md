@@ -106,10 +106,14 @@ The refine package directly calls `mcpserver.RebuildGraph`, `mcpserver.AllTools`
 - **`ToolCallTrace`/`Trajectory` duplicated**: Defined identically in `tools/execute_code.go` and `refine/engine.go`. They're compatible via JSON marshaling. Do not consolidate without also fixing the import cycle that would result.
 - **CHANGELOG.md links point to upstream**: Historical commit/PR links in `CHANGELOG.md` point to `github.com/kurtisvg/skillful-mcp` (the original upstream repo). This is correct — those events happened there. Do not rewrite them.
 
+## Known issues affecting agent workflows
+
+When an `npx <package>` downstream server (gitnexus, brave-search, context7, etc.) fails with a cryptic npm error like `Cannot destructure property 'package' of 'node.target' as it is null`, that is a npm 11.x cache-corruption bug, **not** a skillgraph or downstream-server bug. See the *npx-distributed downstream servers* entry in README § Gotchas for the three fixes (install globally / downgrade npm / nuke `~/.npm/_npx/<hash>`). Prefer globally-installed binaries with absolute paths in `mcp.json` to avoid the class of problem entirely.
+
 <!-- gitnexus:start -->
 # GitNexus — Code Intelligence
 
-This project is indexed by GitNexus as **skillgraph-mcp** (1325 symbols, 2537 relationships, 104 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
+This project is indexed by GitNexus as **skillgraph-mcp** (1386 symbols, 3118 relationships, 85 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
 
 > If any GitNexus tool warns the index is stale, run `npx gitnexus analyze` in terminal first.
 

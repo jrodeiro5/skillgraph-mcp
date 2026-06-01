@@ -2,6 +2,7 @@ package mcpserver
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"sort"
@@ -314,11 +315,39 @@ func pythonizeName(s string) string {
 func (m *Manager) GetServer(name string) (*Server, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-	s, ok := m.servers[name]
-	if !ok {
-		return nil, fmt.Errorf("unknown server: %q", name)
+	if s, ok := m.servers[name]; ok {
+		return s, nil
 	}
-	return s, nil
+	return nil, m.unknownSkillErrorLocked(name)
+}
+
+// unknownSkillErrorLocked builds an actionable error for callers that asked for
+// a skill that isn't connected. It enumerates connected skills so the agent can
+// pick a valid one in the next call, and — when the name is referenced in the
+// skill graph but the downstream is not connected — flags that as a connection
+// issue rather than a typo. Caller must hold m.mu (read or write).
+func (m *Manager) unknownSkillErrorLocked(name string) error {
+	available := make([]string, 0, len(m.servers))
+	for n := range m.servers {
+		available = append(available, n)
+	}
+	sort.Strings(available)
+
+	var msg strings.Builder
+	fmt.Fprintf(&msg, "unknown skill: %q.", name)
+
+	if m.graph != nil {
+		if node, ok := m.graph.Nodes[name]; ok && node.Type == graph.NodeSkill {
+			fmt.Fprintf(&msg, " %q is declared in the skill graph but its downstream server is not connected — check server logs.", name)
+		}
+	}
+
+	if len(available) > 0 {
+		fmt.Fprintf(&msg, " Available skills: %s. Call list_skills for descriptions.", strings.Join(available, ", "))
+	} else {
+		msg.WriteString(" No skills are currently connected.")
+	}
+	return errors.New(msg.String())
 }
 
 func (m *Manager) ListServerNames() []string {

@@ -532,6 +532,20 @@ Manual `relations` entries are merged on top of inferred ones.
 
 **`mcp.json` is mutated at runtime.** The `skillGraph` section (descriptions and relations) is auto-populated and updated by the background refinement loops. Keep a copy if you want to preserve a known-good baseline, or use git to track changes.
 
+**npx-distributed downstream servers can hit npm cache corruption.** Many MCP servers in the example configs (gitnexus, brave-search, context7, etc.) launch via `npx <package>`. npm 11.1.0–11.2.0 has an open bug ([npm/cli#8126](https://github.com/npm/cli/issues/8126)) where a node in the resolver tree comes back with `target: null`, surfacing as:
+
+```
+npm error Cannot destructure property 'package' of 'node.target' as it is null.
+```
+
+Once hit, the `~/.npm/_npx/<hash>/` directory caches the half-installed tree and every subsequent `npx` of the same package re-crashes. The agent typically dead-ends at this point because the error message points nowhere useful. Three fixes, cheapest first:
+
+1. **Install the downstream binary globally** and reference it by absolute path in `mcp.json` (e.g. `"command": "/home/you/.local/share/pnpm/bin/gitnexus"`). Removes npx from the hot path entirely — recommended for stable setups.
+2. **Downgrade npm**: `npm install -g npm@10`. The bug is in 11.x only.
+3. **Nuke the corrupt cache entry**: `mv ~/.npm/_npx/<hash> ~/.npm/_npx/<hash>.bak`. The next run rebuilds cleanly.
+
+This isn't a skillgraph bug — the gateway connects fine and `validate` will show the downstream as failed — but the failure shows up as a cryptic npm error rather than “downstream offline.” Worth checking when a `command: npx ...` server suddenly stops connecting.
+
 **`register_server` over `--transport http` is RCE-by-design.** The `register_server` gateway tool lets any MCP client write a new entry to `mcp.json` — including a `command` field that the gateway will then `exec`. Combined with `--transport http` (which exposes the MCP protocol over an unauthenticated HTTP endpoint), **anyone who can reach the port can register and run arbitrary processes as the gateway's user**. Stick to `--transport stdio` unless you have an authenticating reverse proxy in front, and prefer to keep `register_server` off the allow-list for HTTP deployments.
 
 **`--transport http` has no authentication.** The HTTP transport speaks raw MCP JSON-RPC with no token, header, or origin check. Treat it as `127.0.0.1`-only by default; if you need to expose it, put it behind an auth proxy (caddy, nginx, oauth2-proxy, Cloudflare Access, etc.).

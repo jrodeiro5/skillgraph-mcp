@@ -39,7 +39,55 @@ func TestGetServer(t *testing.T) {
 		if err == nil {
 			t.Fatal("expected error for unknown server")
 		}
+		msg := err.Error()
+		// Error must enumerate connected skills so the agent can recover
+		// without an extra list_skills round-trip.
+		for _, want := range []string{"alpha", "bravo", "list_skills"} {
+			if !strings.Contains(msg, want) {
+				t.Errorf("error message missing %q: %s", want, msg)
+			}
+		}
 	})
+}
+
+// TestGetServerUnknownDeclaredInGraph verifies that when an unknown skill is
+// declared in the graph (e.g. via static relations) but its downstream is not
+// connected, the error flags the connection issue rather than treating it as a
+// typo. This is the gitnexus-style case: agent reaches for a skill it has seen
+// referenced and gets a useful hint instead of a generic "unknown".
+func TestGetServerUnknownDeclaredInGraph(t *testing.T) {
+	t.Parallel()
+
+	m, err := NewManagerFromServers(map[string]*Server{"alpha": {}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Simulate a static relation referencing a skill that failed to connect.
+	m.graph.AddNode("gitnexus", graph.NodeSkill, "gitnexus", "")
+
+	_, err = m.GetServer("gitnexus")
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if !strings.Contains(err.Error(), "not connected") {
+		t.Errorf("expected connection hint, got: %s", err.Error())
+	}
+}
+
+func TestGetServerNoSkillsConnected(t *testing.T) {
+	t.Parallel()
+
+	m, err := NewManagerFromServers(map[string]*Server{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = m.GetServer("anything")
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if !strings.Contains(err.Error(), "No skills") {
+		t.Errorf("expected empty-state hint, got: %s", err.Error())
+	}
 }
 
 func TestListServerNames(t *testing.T) {

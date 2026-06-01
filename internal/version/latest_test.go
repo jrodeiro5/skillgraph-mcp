@@ -45,7 +45,8 @@ func TestCompareInvalid(t *testing.T) {
 }
 
 func TestFetchLatestTagOK(t *testing.T) {
-	t.Parallel()
+	// Mutates the package-level LatestReleaseURL — must not run in parallel
+	// with sibling FetchLatestTag tests that do the same.
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`{"tag_name":"v1.2.3","name":"v1.2.3"}`))
@@ -66,7 +67,6 @@ func TestFetchLatestTagOK(t *testing.T) {
 }
 
 func TestFetchLatestTagNon200(t *testing.T) {
-	t.Parallel()
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "rate limited", http.StatusForbidden)
 	}))
@@ -83,7 +83,6 @@ func TestFetchLatestTagNon200(t *testing.T) {
 }
 
 func TestFetchLatestTagEmpty(t *testing.T) {
-	t.Parallel()
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_, _ = w.Write([]byte(`{}`))
 	}))

@@ -97,7 +97,12 @@ func (g *Graph) Subgraph(nodeID string) *Graph {
 	return sub
 }
 
-// FormatCompact returns a compact string representation of the graph suitable for an LLM context.
+// FormatCompact returns a compact string representation of the graph suitable
+// for an LLM context. Each node and edge renders on a single line: newlines,
+// tabs, and carriage returns in descriptions are collapsed to a single space
+// so multi-line tool docs (e.g. firecrawl tool descriptions containing JSON
+// usage examples) don't break the one-line-per-entry layout that downstream
+// consumers (LLM prompts, lattice docs) depend on.
 func (g *Graph) FormatCompact() string {
 	var sb strings.Builder
 	sb.WriteString("Capability Graph:\n")
@@ -105,7 +110,7 @@ func (g *Graph) FormatCompact() string {
 	for _, n := range g.Nodes {
 		desc := ""
 		if n.Description != "" {
-			desc = " - " + n.Description
+			desc = " - " + flattenDescription(n.Description)
 		}
 		fmt.Fprintf(&sb, "- [%s] %s%s\n", n.Type, n.Name, desc)
 	}
@@ -129,9 +134,33 @@ func (g *Graph) FormatCompact() string {
 
 		descPart := ""
 		if e.Description != "" {
-			descPart = fmt.Sprintf(" (%s)", e.Description)
+			descPart = fmt.Sprintf(" (%s)", flattenDescription(e.Description))
 		}
 		fmt.Fprintf(&sb, "- %s -%s-> %s%s\n", srcName, e.Type, tgtName, descPart)
 	}
 	return sb.String()
+}
+
+// flattenDescription collapses any run containing newlines, tabs, or carriage
+// returns into a single space so a description always fits on one line.
+func flattenDescription(s string) string {
+	if !strings.ContainsAny(s, "\n\r\t") {
+		return s
+	}
+	var b strings.Builder
+	b.Grow(len(s))
+	inBreak := false
+	for _, r := range s {
+		switch r {
+		case '\n', '\r', '\t':
+			inBreak = true
+		default:
+			if inBreak {
+				b.WriteByte(' ')
+				inBreak = false
+			}
+			b.WriteRune(r)
+		}
+	}
+	return strings.TrimSpace(b.String())
 }

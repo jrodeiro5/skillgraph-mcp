@@ -20,6 +20,18 @@ type ClaudeSkillsOptions struct {
 	// ConfigPath is passed to the probe binary so SKILL.md works regardless of
 	// the CWD where Claude Code loads it. Absolute paths recommended.
 	ConfigPath string
+	// Force overwrites existing SKILL.md files. When false (default), the
+	// generator skips skills whose target SKILL.md already exists and reports
+	// them in the returned skip list. Prevents clobbering hand-curated skills
+	// or symlinked content (e.g. a centralized skills hub).
+	Force bool
+}
+
+// GenerateResult reports what GenerateClaudeSkills did. Skipped lists names the
+// generator refused to write because a file already existed and Force was false.
+type GenerateResult struct {
+	Written []string
+	Skipped []string
 }
 
 // GenerateClaudeSkills writes one SKILL.md per downstream skill under outDir.
@@ -27,15 +39,20 @@ type ClaudeSkillsOptions struct {
 // health probe at load time (via the Claude Code `!` injection syntax), and
 // lists the tools the gateway exposes for that skill.
 //
-// The generator is idempotent: re-running overwrites previous files atomically.
+// By default the generator refuses to overwrite an existing SKILL.md (or a
+// symlink standing in for one) and reports skipped names in the result. Pass
+// opts.Force=true to overwrite. This protects hand-curated skills and
+// centralized skill hubs symlinked into the output directory.
+//
 // outDir is created if missing. Skills with names that aren't safe directory
-// names are skipped with a warning.
-func GenerateClaudeSkills(outDir string, cfgs map[string]config.Server, g *graph.Graph, opts ClaudeSkillsOptions) error {
+// names are reported in the skip list.
+func GenerateClaudeSkills(outDir string, cfgs map[string]config.Server, g *graph.Graph, opts ClaudeSkillsOptions) (GenerateResult, error) {
+	var result GenerateResult
 	if opts.BinaryPath == "" {
 		opts.BinaryPath = "skillgraph-mcp"
 	}
 	if err := os.MkdirAll(outDir, 0o755); err != nil {
-		return fmt.Errorf("create skills dir %s: %w", outDir, err)
+		return result, fmt.Errorf("create skills dir %s: %w", outDir, err)
 	}
 
 	names := make([]string, 0, len(cfgs))
@@ -44,25 +61,45 @@ func GenerateClaudeSkills(outDir string, cfgs map[string]config.Server, g *graph
 	}
 	sort.Strings(names)
 
-	written := 0
 	for _, name := range names {
 		if !isSafeSkillName(name) {
 			slog.Warn("skipping skill with unsafe name", "skill", name)
+			result.Skipped = append(result.Skipped, name+" (unsafe name)")
 			continue
 		}
-		content := renderSkillMD(name, cfgs[name], g, opts)
 		dir := filepath.Join(outDir, name)
-		if err := os.MkdirAll(dir, 0o755); err != nil {
-			return fmt.Errorf("create skill dir %s: %w", dir, err)
-		}
 		path := filepath.Join(dir, "SKILL.md")
-		if err := atomicWrite(path, []byte(content)); err != nil {
-			return fmt.Errorf("write %s: %w", path, err)
+
+		// Guard: refuse to clobber existing content unless Force is set. Lstat
+		// (not Stat) so symlinks are detected as "exists" — a symlinked SKILL.md
+		// pointing at a centralized hub would otherwise be overwritten via the
+		// link target.
+		if !opts.Force {
+			if _, err := os.Lstat(path); err == nil {
+				slog.Info("skipping existing SKILL.md (use Force to overwrite)", "path", path)
+				result.Skipped = append(result.Skipped, name+" (exists)")
+				continue
+			}
+			// Also refuse if the parent skill dir is a symlink (entire skill is
+			// likely a hub-managed package).
+			if info, err := os.Lstat(dir); err == nil && info.Mode()&os.ModeSymlink != 0 {
+				slog.Info("skipping skill dir which is a symlink (use Force to overwrite)", "dir", dir)
+				result.Skipped = append(result.Skipped, name+" (symlink)")
+				continue
+			}
 		}
-		written++
+
+		content := renderSkillMD(name, cfgs[name], g, opts)
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			return result, fmt.Errorf("create skill dir %s: %w", dir, err)
+		}
+		if err := atomicWrite(path, []byte(content)); err != nil {
+			return result, fmt.Errorf("write %s: %w", path, err)
+		}
+		result.Written = append(result.Written, name)
 	}
-	slog.Info("generated Claude Code SKILL.md files", "dir", outDir, "count", written)
-	return nil
+	slog.Info("generated Claude Code SKILL.md files", "dir", outDir, "written", len(result.Written), "skipped", len(result.Skipped))
+	return result, nil
 }
 
 func renderSkillMD(name string, srv config.Server, g *graph.Graph, opts ClaudeSkillsOptions) string {

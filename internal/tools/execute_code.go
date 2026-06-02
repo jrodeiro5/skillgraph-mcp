@@ -47,6 +47,25 @@ func (c *TraceCollector) Add(call trace.ToolCallTrace) {
 	c.ToolCalls = append(c.ToolCalls, call)
 }
 
+// maxTraceFieldBytes caps any single Output/Error/ToolCall.Result string so a
+// runaway tool dump can't poison the SkillOpt batch with a multi-hundred-KB
+// trace. Truncation marker is appended; downstream LLM still sees the shape.
+const maxTraceFieldBytes = 50000
+
+func truncateTraceField(t *trace.Trajectory) {
+	trunc := func(s string) string {
+		if len(s) <= maxTraceFieldBytes {
+			return s
+		}
+		return s[:maxTraceFieldBytes] + fmt.Sprintf("\n...[truncated %d bytes]", len(s)-maxTraceFieldBytes)
+	}
+	t.Output = trunc(t.Output)
+	t.Error = trunc(t.Error)
+	for i := range t.ToolCalls {
+		t.ToolCalls[i].Result = trunc(t.ToolCalls[i].Result)
+	}
+}
+
 func RegisterExecuteCode(s *mcp.Server, mgr *mcpserver.Manager, latticeDir string) {
 	mcp.AddTool(
 		s,
@@ -112,6 +131,7 @@ func newExecuteCode(mgr *mcpserver.Manager, latticeDir string) func(context.Cont
 		// sub-millisecond on any sane FS; the previous fire-and-forget goroutine
 		// raced with t.TempDir() cleanup in tests and silently dropped traces
 		// when the process exited mid-write (also a real risk on SIGTERM).
+		truncateTraceField(&traj)
 		tracesDir := filepath.Join(latticeDir, "traces")
 		if err := os.MkdirAll(tracesDir, 0755); err == nil {
 			if data, jerr := json.MarshalIndent(traj, "", "  "); jerr == nil {

@@ -331,6 +331,147 @@ func TestAnyToMonty(t *testing.T) {
 	}
 }
 
+// TestExecuteCodeReturnDict verifies that returning a dict from execute_code
+// produces valid JSON, not just the string "dict".
+func TestExecuteCodeReturnDict(t *testing.T) {
+	t.Parallel()
+
+	ctx := t.Context()
+	ds := mcp.NewServer(&mcp.Implementation{Name: "dict-server"}, nil)
+	type EmptyInput struct{}
+	mcp.AddTool(
+		ds,
+		&mcp.Tool{Name: "get_user", Description: "Get a user"},
+		func(ctx context.Context, req *mcp.CallToolRequest, _ EmptyInput) (*mcp.CallToolResult, any, error) {
+			return &mcp.CallToolResult{}, map[string]any{"name": "Alice", "age": float64(30)}, nil
+		},
+	)
+
+	mgr, err := mcpserver.NewManagerFromServers(ctx, map[string]*mcp.Server{"dict-server": ds})
+	if err != nil {
+		t.Fatalf("NewManagerFromServers: %v", err)
+	}
+	t.Cleanup(func() { mgr.Close() })
+
+	executeCode, err := newExecuteCode(mgr, t.TempDir())
+	if err != nil {
+		t.Fatalf("newExecuteCode: %v", err)
+	}
+
+	req := &mcp.CallToolRequest{}
+	req.Params.Arguments = map[string]any{"code": "result = get_user()\nreturn result"}
+	res, _, err := executeCode(ctx, req)
+	if err != nil {
+		t.Fatalf("execute_code error: %v", err)
+	}
+
+	got := res.Content[0].(*mcp.TextContent).Text
+	if got == "dict" {
+		t.Fatal("execute_code returned \"dict\" instead of JSON — dict serialization broken")
+	}
+	var parsed map[string]any
+	if err := json.Unmarshal([]byte(got), &parsed); err != nil {
+		t.Fatalf("result is not valid JSON: %v (got: %q)", err, got)
+	}
+	if parsed["name"] != "Alice" {
+		t.Errorf("name = %v, want Alice", parsed["name"])
+	}
+}
+
+// TestExecuteCodeReturnList verifies that returning a list from execute_code
+// produces valid JSON array, not just the string "list".
+func TestExecuteCodeReturnList(t *testing.T) {
+	t.Parallel()
+
+	ctx := t.Context()
+	ds := mcp.NewServer(&mcp.Implementation{Name: "list-server"}, nil)
+	type EmptyInput struct{}
+	mcp.AddTool(
+		ds,
+		&mcp.Tool{Name: "list_items", Description: "List items"},
+		func(ctx context.Context, req *mcp.CallToolRequest, _ EmptyInput) (*mcp.CallToolResult, any, error) {
+			return &mcp.CallToolResult{}, []any{"alpha", "beta", "gamma"}, nil
+		},
+	)
+
+	mgr, err := mcpserver.NewManagerFromServers(ctx, map[string]*mcp.Server{"list-server": ds})
+	if err != nil {
+		t.Fatalf("NewManagerFromServers: %v", err)
+	}
+	t.Cleanup(func() { mgr.Close() })
+
+	executeCode, err := newExecuteCode(mgr, t.TempDir())
+	if err != nil {
+		t.Fatalf("newExecuteCode: %v", err)
+	}
+
+	req := &mcp.CallToolRequest{}
+	req.Params.Arguments = map[string]any{"code": "items = list_items()\nreturn items"}
+	res, _, err := executeCode(ctx, req)
+	if err != nil {
+		t.Fatalf("execute_code error: %v", err)
+	}
+
+	got := res.Content[0].(*mcp.TextContent).Text
+	if got == "list" {
+		t.Fatal("execute_code returned \"list\" instead of JSON — list serialization broken")
+	}
+	var parsed []any
+	if err := json.Unmarshal([]byte(got), &parsed); err != nil {
+		t.Fatalf("result is not valid JSON array: %v (got: %q)", err, got)
+	}
+	if len(parsed) != 3 || parsed[0] != "alpha" {
+		t.Errorf("items = %v, want [alpha beta gamma]", parsed)
+	}
+}
+
+// TestExecuteCodeReturnListOfDicts verifies nested list-of-dicts serialization
+// (the pattern returned by tools like brave_web_search).
+func TestExecuteCodeReturnListOfDicts(t *testing.T) {
+	t.Parallel()
+
+	ctx := t.Context()
+	ds := mcp.NewServer(&mcp.Implementation{Name: "results-server"}, nil)
+	type EmptyInput struct{}
+	mcp.AddTool(
+		ds,
+		&mcp.Tool{Name: "search", Description: "Search results"},
+		func(ctx context.Context, req *mcp.CallToolRequest, _ EmptyInput) (*mcp.CallToolResult, any, error) {
+			return &mcp.CallToolResult{}, []any{
+				map[string]any{"url": "https://example.com", "title": "Example"},
+				map[string]any{"url": "https://other.com", "title": "Other"},
+			}, nil
+		},
+	)
+
+	mgr, err := mcpserver.NewManagerFromServers(ctx, map[string]*mcp.Server{"results-server": ds})
+	if err != nil {
+		t.Fatalf("NewManagerFromServers: %v", err)
+	}
+	t.Cleanup(func() { mgr.Close() })
+
+	executeCode, err := newExecuteCode(mgr, t.TempDir())
+	if err != nil {
+		t.Fatalf("newExecuteCode: %v", err)
+	}
+
+	req := &mcp.CallToolRequest{}
+	req.Params.Arguments = map[string]any{"code": "results = search()\nreturn results"}
+	res, _, err := executeCode(ctx, req)
+	if err != nil {
+		t.Fatalf("execute_code error: %v", err)
+	}
+
+	got := res.Content[0].(*mcp.TextContent).Text
+	var parsed []map[string]any
+	if err := json.Unmarshal([]byte(got), &parsed); err != nil {
+		t.Fatalf("result is not valid JSON: %v (got: %q)", err, got)
+	}
+	if len(parsed) != 2 || parsed[0]["url"] != "https://example.com" {
+		t.Errorf("unexpected results: %v", parsed)
+	}
+}
+
 func TestExecuteCodeTrajectoryLogging(t *testing.T) {
 	t.Parallel()
 

@@ -581,6 +581,11 @@ func passesHoldoutGate(toolName, proposed, current string, holdOut []trace.Traje
 // an automatic rollback to the pre-edit snapshot.
 const rollbackThreshold = 1.5
 
+// traceTTL bounds how long a trace file survives in latticeDir/traces before
+// the SkillOpt loop garbage-collects it. Error-containing batches are kept by
+// optimizeTraces for analysis, so without a TTL the directory grows forever.
+const traceTTL = 7 * 24 * time.Hour
+
 // computeErrRate returns the fraction of traces in files that contain an error.
 func computeErrRate(files []string) float64 {
 	total, errCount := 0, 0
@@ -660,6 +665,27 @@ func startOptimizationLoop(ctx context.Context, provider, key, configPath string
 			// Read trace files
 			files, err := filepath.Glob(filepath.Join(tracesDir, "*.json"))
 			if err != nil || len(files) == 0 {
+				continue
+			}
+
+			// TTL purge: drop traces older than traceTTL. Without this, failed-batch
+			// files accumulate forever (optimizeTraces only deletes no-error batches)
+			// and the *.json glob grows unbounded.
+			cutoff := time.Now().Add(-traceTTL)
+			fresh := files[:0]
+			for _, f := range files {
+				info, statErr := os.Stat(f)
+				if statErr != nil {
+					continue
+				}
+				if info.ModTime().Before(cutoff) {
+					_ = os.Remove(f)
+					continue
+				}
+				fresh = append(fresh, f)
+			}
+			files = fresh
+			if len(files) == 0 {
 				continue
 			}
 

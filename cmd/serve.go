@@ -105,6 +105,18 @@ func runServe(args []string) {
 		slog.Info("no embedding provider configured — find_tools disabled (set LLM_BASE_URL/OLLAMA_HOST or OPENAI_API_KEY to enable)")
 	}
 
+	// Rebuild embed index whenever the graph is updated by SkillOpt.
+	if idx != nil {
+		mgr.SetOnRebuild(func() {
+			newEntries := tools.BuildIndexEntries(mgr)
+			if err := idx.Rebuild(context.Background(), newEntries); err != nil {
+				slog.Warn("embed index rebuild failed", "error", err)
+			} else {
+				slog.Info("embed index rebuilt", "tools", idx.Len())
+			}
+		})
+	}
+
 	s := app.NewServer(mgr, opts.latticeDir, opts.configPath, opts.transport, opts.host, idx)
 	var serveErr error
 	switch opts.transport {

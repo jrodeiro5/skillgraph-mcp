@@ -16,10 +16,17 @@ import (
 )
 
 type Manager struct {
-	mu      sync.RWMutex
-	servers map[string]*Server
-	tools   []Tool
-	graph   *graph.Graph
+	mu        sync.RWMutex
+	servers   map[string]*Server
+	tools     []Tool
+	graph     *graph.Graph
+	onRebuild func()
+}
+
+func (m *Manager) SetOnRebuild(fn func()) {
+	m.mu.Lock()
+	m.onRebuild = fn
+	m.mu.Unlock()
 }
 
 // NewManager creates a Manager by connecting to all servers in the config.
@@ -237,7 +244,12 @@ func (m *Manager) RebuildGraph(graphCfg *config.SkillGraphConfig) {
 	// Atomically switch graph
 	m.mu.Lock()
 	m.graph = g
+	onRebuild := m.onRebuild
 	m.mu.Unlock()
+
+	if onRebuild != nil {
+		go onRebuild()
+	}
 }
 
 func (m *Manager) inferRelations(g *graph.Graph) {

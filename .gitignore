@@ -48,6 +48,9 @@ vendor/
 .mcp_lattice/
 .gitnexus
 
+# Playwright MCP session artifacts
+.playwright-mcp/
+
 # act (nektos/act) local CI artifacts
 .act-cache/
 act-event.json

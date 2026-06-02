@@ -17,7 +17,7 @@ func RegisterListSkills(s *mcp.Server, mgr *mcpserver.Manager) {
 		s,
 		&mcp.Tool{
 			Name:        "list_skills",
-			Description: "List all available skills with their descriptions",
+			Description: "List all available skills (downstream MCP servers) by name. IMPORTANT: skills are NOT directly callable as MCP tools. They are accessed only via the execute_code sandbox. Workflow: list_skills → use_skill(name) to see tool signatures → execute_code(python) to call them.",
 		},
 		newListSkills(mgr),
 	)

@@ -23,14 +23,20 @@ type executeCodeInput struct {
 	Code string `json:"code" jsonschema:"python code that calls downstream tools by name and returns a computed result"`
 }
 
-const executeCodeDescription = `Execute Python code in a secure sandbox to orchestrate multiple tool calls and return a computed result.
+const executeCodeDescription = `Execute Python code in an isolated sandbox. This is the INDIRECTION POINT for all downstream skill tools — they are NOT available as MCP tools, only as Python functions here.
 
-All downstream tools are available as functions, called by name:
-  result = tool_name(arg1, arg2, key=value) -> str
+HOW IT WORKS:
+  1. use_skill(skill_name) → returns Python function signatures
+  2. execute_code("""result = function_name(args)""") → calls them
 
-Positional and keyword arguments are both supported.
+EXAMPLE WORKFLOW (gitnexus):
+  (a) list_skills() → see "gitnexus: Code intelligence"
+  (b) use_skill("gitnexus") → see "gitnexus_impact(target: str, direction: str) -> str"
+  (c) execute_code("""result = gitnexus_impact(target="authenticate", direction="up")""")
 
-IMPORTANT: Only call tools that were returned by use_skill or described in resources. Do not guess tool names or schemas — first call use_skill to discover the available tools and their input schemas for a given skill, then write code that calls those tools.`
+GOTCHA: You cannot call gitnexus_impact, firecrawl_scrape, brave_web_search, or any
+other downstream tool as an MCP tool directly. They do not exist as MCP tools.
+They only exist as Python functions inside this sandbox.`
 
 type contextKey string
 
@@ -67,18 +73,19 @@ func truncateTraceField(t *trace.Trajectory) {
 }
 
 func RegisterExecuteCode(s *mcp.Server, mgr *mcpserver.Manager, latticeDir string) {
+	fn, _ := newExecuteCode(mgr, latticeDir)
 	mcp.AddTool(
 		s,
 		&mcp.Tool{
 			Name:        "execute_code",
 			Description: executeCodeDescription,
 		},
-		newExecuteCode(mgr, latticeDir),
+		fn,
 	)
 }
 
-func newExecuteCode(mgr *mcpserver.Manager, latticeDir string) func(context.Context, *mcp.CallToolRequest, executeCodeInput) (*mcp.CallToolResult, any, error) {
-	return func(ctx context.Context, req *mcp.CallToolRequest, input executeCodeInput) (*mcp.CallToolResult, any, error) {
+func newExecuteCode(mgr *mcpserver.Manager, latticeDir string) (func(context.Context, *mcp.CallToolRequest, executeCodeInput) (*mcp.CallToolResult, any, error), error) {
+	fn := func(ctx context.Context, req *mcp.CallToolRequest, input executeCodeInput) (*mcp.CallToolResult, any, error) {
 		if input.Code == "" {
 			result := &mcp.CallToolResult{}
 			result.SetError(errors.New("code must not be empty"))
@@ -150,9 +157,27 @@ func newExecuteCode(mgr *mcpserver.Manager, latticeDir string) func(context.Cont
 			return result, nil, nil
 		}
 
+		text := montyValueToText(value)
 		return &mcp.CallToolResult{
-			Content: []mcp.Content{&mcp.TextContent{Text: value.String()}},
+			Content: []mcp.Content{&mcp.TextContent{Text: text}},
 		}, nil, nil
+	}
+	return fn, nil
+}
+
+// montyValueToText serializes a Monty value to a string for tool output.
+// Dicts and lists are JSON-marshaled; all other types use .String().
+func montyValueToText(v monty.Value) string {
+	switch v.Kind() {
+	case "dict", "list", "tuple":
+		goVal := montyValueToAny(v)
+		data, err := json.Marshal(goVal)
+		if err != nil {
+			return v.String()
+		}
+		return string(data)
+	default:
+		return v.String()
 	}
 }
 

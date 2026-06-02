@@ -11,8 +11,10 @@ import (
 	"github.com/jrodeiro5/skillgraph-mcp/internal/app"
 	"github.com/jrodeiro5/skillgraph-mcp/internal/config"
 	"github.com/jrodeiro5/skillgraph-mcp/internal/docs"
+	"github.com/jrodeiro5/skillgraph-mcp/internal/embed"
 	"github.com/jrodeiro5/skillgraph-mcp/internal/mcpserver"
 	"github.com/jrodeiro5/skillgraph-mcp/internal/refine"
+	"github.com/jrodeiro5/skillgraph-mcp/internal/tools"
 	"github.com/jrodeiro5/skillgraph-mcp/internal/version"
 
 	flag "github.com/spf13/pflag"
@@ -86,7 +88,24 @@ func runServe(args []string) {
 
 	refine.StartRefinementLoop(ctx, opts.configPath, mgr, opts.latticeDir, servers)
 
-	s := app.NewServer(mgr, opts.latticeDir, opts.configPath, opts.transport, opts.host)
+	// Build embedding index — runs sync at boot, nil if no provider configured.
+	var idx *embed.Index
+	embedCfg := embed.ResolveConfig()
+	if embedCfg.Provider != embed.ProviderNone {
+		embedder := embed.NewEmbedder(embedCfg)
+		idx = embed.NewIndex(embedder)
+		entries := tools.BuildIndexEntries(mgr)
+		if err := idx.Rebuild(ctx, entries); err != nil {
+			slog.Warn("embedding index build failed, find_tools will be unavailable", "error", err)
+			idx = nil
+		} else {
+			slog.Info("embedding index ready", "tools", idx.Len(), "provider", embedCfg.Model)
+		}
+	} else {
+		slog.Info("no embedding provider configured — find_tools disabled (set LLM_BASE_URL/OLLAMA_HOST or OPENAI_API_KEY to enable)")
+	}
+
+	s := app.NewServer(mgr, opts.latticeDir, opts.configPath, opts.transport, opts.host, idx)
 	var serveErr error
 	switch opts.transport {
 	case "stdio":

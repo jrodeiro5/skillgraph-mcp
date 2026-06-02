@@ -19,7 +19,7 @@ func RegisterUseSkill(s *mcp.Server, mgr *mcpserver.Manager) {
 		s,
 		&mcp.Tool{
 			Name:        "use_skill",
-			Description: "List tools and resources available in a specific skill. Tool names match the function names available in execute_code.",
+			Description: "Show the tool signatures and resources for a specific skill (downstream server). Returns function signatures you can call inside execute_code. IMPORTANT: these tools are NOT MCP tools you can call directly — they are Python functions only accessible inside the execute_code sandbox. After calling use_skill, write execute_code(code) to invoke them.",
 		},
 		newUseSkill(mgr),
 	)

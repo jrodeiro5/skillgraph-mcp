@@ -132,6 +132,27 @@ func NewManager(ctx context.Context, cfgs map[string]config.Server, graphCfg *co
 	return m, nil
 }
 
+// NewManagerFromMCPServers creates a Manager from raw *mcp.Server instances by
+// wiring each through an in-memory transport. Useful for unit tests.
+func NewManagerFromMCPServers(ctx context.Context, servers map[string]*mcp.Server) (*Manager, error) {
+	built := make(map[string]*Server, len(servers))
+	for name, s := range servers {
+		serverT, clientT := mcp.NewInMemoryTransports()
+		go func(srv *mcp.Server, t mcp.Transport) { _ = srv.Run(ctx, t) }(s, serverT)
+		client := mcp.NewClient(&mcp.Implementation{Name: name + "-test-client"}, nil)
+		session, err := client.Connect(ctx, clientT, nil)
+		if err != nil {
+			return nil, fmt.Errorf("connect %s: %w", name, err)
+		}
+		srv, err := NewServerFromSession(ctx, session)
+		if err != nil {
+			return nil, fmt.Errorf("server %s: %w", name, err)
+		}
+		built[name] = srv
+	}
+	return NewManagerFromServers(built)
+}
+
 // NewManagerFromServers creates a Manager from pre-built Servers (useful for testing).
 func NewManagerFromServers(servers map[string]*Server) (*Manager, error) {
 	m := &Manager{

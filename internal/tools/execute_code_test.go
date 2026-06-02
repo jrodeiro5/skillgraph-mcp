@@ -21,11 +21,11 @@ func TestExecuteCodeDescriptionRefersToUseSkill(t *testing.T) {
 	if !strings.Contains(executeCodeDescription, "use_skill") {
 		t.Error("description should refer to use_skill for tool discovery")
 	}
-	if !strings.Contains(executeCodeDescription, "tool_name") {
-		t.Error("description should show tools are called by name")
+	if !strings.Contains(executeCodeDescription, "execute_code") {
+		t.Error("description should mention execute_code")
 	}
-	if !strings.Contains(executeCodeDescription, "resources") {
-		t.Error("description should mention resources")
+	if !strings.Contains(executeCodeDescription, "GOTCHA") {
+		t.Error("description should mention GOTCHA")
 	}
 }
 
@@ -347,7 +347,7 @@ func TestExecuteCodeReturnDict(t *testing.T) {
 		},
 	)
 
-	mgr, err := mcpserver.NewManagerFromServers(ctx, map[string]*mcp.Server{"dict-server": ds})
+	mgr, err := mcpserver.NewManagerFromMCPServers(ctx, map[string]*mcp.Server{"dict-server": ds})
 	if err != nil {
 		t.Fatalf("NewManagerFromServers: %v", err)
 	}
@@ -359,8 +359,7 @@ func TestExecuteCodeReturnDict(t *testing.T) {
 	}
 
 	req := &mcp.CallToolRequest{}
-	req.Params.Arguments = map[string]any{"code": "result = get_user()\nreturn result"}
-	res, _, err := executeCode(ctx, req)
+	res, _, err := executeCode(ctx, req, executeCodeInput{Code: "result = get_user()\nreturn result"})
 	if err != nil {
 		t.Fatalf("execute_code error: %v", err)
 	}
@@ -394,7 +393,7 @@ func TestExecuteCodeReturnList(t *testing.T) {
 		},
 	)
 
-	mgr, err := mcpserver.NewManagerFromServers(ctx, map[string]*mcp.Server{"list-server": ds})
+	mgr, err := mcpserver.NewManagerFromMCPServers(ctx, map[string]*mcp.Server{"list-server": ds})
 	if err != nil {
 		t.Fatalf("NewManagerFromServers: %v", err)
 	}
@@ -406,8 +405,7 @@ func TestExecuteCodeReturnList(t *testing.T) {
 	}
 
 	req := &mcp.CallToolRequest{}
-	req.Params.Arguments = map[string]any{"code": "items = list_items()\nreturn items"}
-	res, _, err := executeCode(ctx, req)
+	res, _, err := executeCode(ctx, req, executeCodeInput{Code: "items = list_items()\nreturn items"})
 	if err != nil {
 		t.Fatalf("execute_code error: %v", err)
 	}
@@ -444,7 +442,7 @@ func TestExecuteCodeReturnListOfDicts(t *testing.T) {
 		},
 	)
 
-	mgr, err := mcpserver.NewManagerFromServers(ctx, map[string]*mcp.Server{"results-server": ds})
+	mgr, err := mcpserver.NewManagerFromMCPServers(ctx, map[string]*mcp.Server{"results-server": ds})
 	if err != nil {
 		t.Fatalf("NewManagerFromServers: %v", err)
 	}
@@ -456,8 +454,7 @@ func TestExecuteCodeReturnListOfDicts(t *testing.T) {
 	}
 
 	req := &mcp.CallToolRequest{}
-	req.Params.Arguments = map[string]any{"code": "results = search()\nreturn results"}
-	res, _, err := executeCode(ctx, req)
+	res, _, err := executeCode(ctx, req, executeCodeInput{Code: "results = search()\nreturn results"})
 	if err != nil {
 		t.Fatalf("execute_code error: %v", err)
 	}
@@ -512,7 +509,10 @@ func TestExecuteCodeTrajectoryLogging(t *testing.T) {
 	tracesDir := filepath.Join(latticeDir, "traces")
 	_ = os.RemoveAll(tracesDir)
 
-	fn := newExecuteCode(mgr, latticeDir)
+	fn, err := newExecuteCode(mgr, latticeDir)
+	if err != nil {
+		t.Fatal(err)
+	}
 	req := &mcp.CallToolRequest{}
 	input := executeCodeInput{
 		Code: `greet("world")`,

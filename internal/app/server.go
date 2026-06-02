@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/jrodeiro5/skillgraph-mcp/internal/embed"
 	"github.com/jrodeiro5/skillgraph-mcp/internal/mcpserver"
 	"github.com/jrodeiro5/skillgraph-mcp/internal/tools"
 	"github.com/jrodeiro5/skillgraph-mcp/internal/version"
@@ -19,7 +20,8 @@ import (
 // transport and host describe how the gateway itself is being served, so
 // register_server can gate registration when bound to a non-loopback HTTP
 // address (see ADR-0001).
-func NewServer(mgr *mcpserver.Manager, latticeDir, configPath, transport, host string) *mcp.Server {
+// idx may be nil — find_tools degrades gracefully with a helpful error message.
+func NewServer(mgr *mcpserver.Manager, latticeDir, configPath, transport, host string, idx *embed.Index) *mcp.Server {
 	s := mcp.NewServer(&mcp.Implementation{
 		Name:    "skillgraph-mcp",
 		Version: version.Version,
@@ -29,6 +31,7 @@ func NewServer(mgr *mcpserver.Manager, latticeDir, configPath, transport, host s
 	tools.RegisterUseSkill(s, mgr)
 	tools.RegisterReadResource(s, mgr)
 	tools.RegisterExecuteCode(s, mgr, latticeDir)
+	tools.RegisterFindTools(s, mgr, idx)
 	tools.RegisterGetSkillGraph(s, mgr)
 	tools.RegisterPlanWorkflow(s, mgr)
 	tools.RegisterReadLattice(s, mgr, latticeDir)

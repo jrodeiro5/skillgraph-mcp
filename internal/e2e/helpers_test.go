@@ -56,7 +56,7 @@ func startFakeServer(t *testing.T, ctx context.Context, instructions string, too
 func connectTestClient(t *testing.T, ctx context.Context, mgr *mcpserver.Manager) *mcp.ClientSession {
 	t.Helper()
 
-	upstream := app.NewServer(mgr, t.TempDir(), "", "stdio", "")
+	upstream := app.NewServer(mgr, t.TempDir(), "", "stdio", "", nil)
 	serverT, clientT := mcp.NewInMemoryTransports()
 	go func() { _ = upstream.Run(ctx, serverT) }()
 

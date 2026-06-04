@@ -34,9 +34,13 @@ func newUseSkill(mgr *mcpserver.Manager) func(context.Context, *mcp.CallToolRequ
 			return result, nil, nil
 		}
 
+		skillTools := mgr.ServerTools(input.SkillName)
 		var lines []string
-		for _, t := range mgr.ServerTools(input.SkillName) {
+		for _, t := range skillTools {
 			lines = append(lines, t.Signature())
+		}
+		if len(skillTools) > 10 {
+			lines = append(lines, fmt.Sprintf("\nTIP: This skill has %d tools. Use find_tools(query, server_filter=%q) to find specific tools without reading all signatures.", len(skillTools), input.SkillName))
 		}
 
 		if resources := srv.Resources(); len(resources) > 0 {

@@ -228,11 +228,13 @@ type SearchResult struct {
 func (idx *Index) Rebuild(ctx context.Context, tools []ToolEntry) error {
 	embedded := make([]ToolEntry, 0, len(tools))
 	for _, t := range tools {
-		vec, err := idx.embedder.Embed(ctx, t.Description)
-		if err != nil {
-			return fmt.Errorf("embed %s/%s: %w", t.Server, t.ToolName, err)
+		if idx.embedder != nil {
+			vec, err := idx.embedder.Embed(ctx, t.Description)
+			if err != nil {
+				return fmt.Errorf("embed %s/%s: %w", t.Server, t.ToolName, err)
+			}
+			t.Vector = vec
 		}
-		t.Vector = vec
 		embedded = append(embedded, t)
 	}
 
@@ -245,21 +247,34 @@ func (idx *Index) Rebuild(ctx context.Context, tools []ToolEntry) error {
 // Find returns the top-k tools most similar to query.
 // If serverFilter is non-empty, only tools from that server are considered.
 func (idx *Index) Find(ctx context.Context, query string, k int, serverFilter string) ([]SearchResult, error) {
-	qvec, err := idx.embedder.Embed(ctx, query)
-	if err != nil {
-		return nil, fmt.Errorf("embed query: %w", err)
-	}
-
 	idx.mu.RLock()
 	entries := idx.entries
 	idx.mu.RUnlock()
+
+	// Use keyword scoring when embedder is unavailable or entries have no vectors.
+	useKeyword := idx.embedder == nil || (len(entries) > 0 && len(entries[0].Vector) == 0)
+
+	var qvec []float32
+	if !useKeyword {
+		var err error
+		qvec, err = idx.embedder.Embed(ctx, query)
+		if err != nil {
+			// Embedding failed at query time — fall back to keyword.
+			useKeyword = true
+		}
+	}
 
 	var candidates []scoredEntry
 	for _, e := range entries {
 		if serverFilter != "" && e.Server != serverFilter {
 			continue
 		}
-		s := cosine(qvec, e.Vector)
+		var s float32
+		if useKeyword || len(e.Vector) == 0 {
+			s = keywordScore(query, e)
+		} else {
+			s = cosine(qvec, e.Vector)
+		}
 		candidates = append(candidates, scoredEntry{
 			entry: SearchResult{
 				Server:      e.Server,
@@ -278,6 +293,37 @@ func (idx *Index) Find(ctx context.Context, query string, k int, serverFilter st
 		results[i] = c.entry
 	}
 	return results, nil
+}
+
+// keywordScore scores a ToolEntry against a query using normalized term overlap.
+// Used as fallback when no embedding provider is configured.
+func keywordScore(query string, e ToolEntry) float32 {
+	terms := tokenize(query)
+	if len(terms) == 0 {
+		return 0
+	}
+	doc := strings.ToLower(e.ToolName + " " + e.Description)
+	hits := 0
+	for _, t := range terms {
+		if strings.Contains(doc, t) {
+			hits++
+		}
+	}
+	return float32(hits) / float32(len(terms))
+}
+
+// tokenize splits text into lowercase non-empty tokens.
+func tokenize(s string) []string {
+	s = strings.ToLower(s)
+	var tokens []string
+	for _, word := range strings.FieldsFunc(s, func(r rune) bool {
+		return r == ' ' || r == '_' || r == '-' || r == '.' || r == '/' || r == '(' || r == ')' || r == ','
+	}) {
+		if word != "" {
+			tokens = append(tokens, word)
+		}
+	}
+	return tokens
 }
 
 // Len returns the number of indexed tools.

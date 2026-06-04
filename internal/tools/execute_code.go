@@ -20,7 +20,8 @@ import (
 )
 
 type executeCodeInput struct {
-	Code string `json:"code" jsonschema:"python code that calls downstream tools by name and returns a computed result"`
+	Code       string   `json:"code" jsonschema:"python code that calls downstream tools by name and returns a computed result"`
+	SkillNames []string `json:"skill_names,omitempty" jsonschema:"optional: limit available tools to these skill names (reduces sandbox size for large deployments)"`
 }
 
 const executeCodeDescription = `Execute Python code in an isolated sandbox. This is the INDIRECTION POINT for all downstream skill tools — they are NOT available as MCP tools, only as Python functions here.
@@ -100,6 +101,19 @@ func newExecuteCode(mgr *mcpserver.Manager, latticeDir string) (func(context.Con
 		}
 
 		tools := mgr.AllTools()
+		if len(input.SkillNames) > 0 {
+			allowed := make(map[string]bool, len(input.SkillNames))
+			for _, s := range input.SkillNames {
+				allowed[s] = true
+			}
+			filtered := tools[:0]
+			for _, t := range tools {
+				if allowed[t.ServerName] {
+					filtered = append(filtered, t)
+				}
+			}
+			tools = filtered
+		}
 		fns := make(map[string]monty.ExternalFunction, len(tools))
 		for _, t := range tools {
 			srv, err := mgr.GetServer(t.ServerName)

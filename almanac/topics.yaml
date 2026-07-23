@@ -1,0 +1,13 @@
+topics:
+  - slug: concepts
+    title: Concepts
+    description: Core vocabulary and mental models for this codebase
+    parents: []
+  - slug: architecture
+    title: Architecture
+    description: System architecture, components, and design decisions
+    parents: [concepts]
+  - slug: gotchas
+    title: Gotchas
+    description: Known issues, bugs, and operational pitfalls
+    parents: [architecture]

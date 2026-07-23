@@ -1,0 +1,23 @@
+almanac/README.md
+  s_49a5827e99b5c4::t_c18f2c432e875b 31-47
+almanac/architecture/gateway-routing.md
+  s_49a5827e99b5c4::t_90c885659b3bfb 52
+almanac/guides/npx-cache-corruption.md
+  s_49a5827e99b5c4::t_877d90221a5b40 46
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.15",
+  "base_commit_sha": "20c3ffd696f81d9cd0539403bade35e71a36d626",
+  "prompts": {},
+  "sessions": {
+    "s_49a5827e99b5c4": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "87db986d-1ed7-4880-af76-c468ccf33af1",
+        "model": "unknown"
+      },
+      "human_author": "jrodeiro5 <jrodeiro.dev@gmail.com>"
+    }
+  }
+}

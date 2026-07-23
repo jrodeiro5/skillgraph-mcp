@@ -4,7 +4,6 @@ topics: [architecture, gotchas]
 sources:
   - {id: npx_bug_doc, type: file, path: docs/GITNEXUS_NPX_BUG.md}
   - {id: readme_gotcha, type: file, path: README.md, note: Gotchas section}
-  - {id: commit_npx_bug, type: file, path: docs/GITNEXUS_NPX_BUG.md, note: commit that added docs}
 ---
 
 # npx Cache Corruption (npm 11.x)
@@ -44,7 +43,7 @@ The gateway handles the failed connection gracefully — `validate` shows the do
 
 ## Prevention
 
-Prefer globally-installed binaries with absolute paths in `mcp.json` to avoid the entire class of problem. This is the recommended approach for all downstream MCP servers (gitnexus, brave-search, context7, etc.) [@commit_npx_bug].
+Prefer globally-installed binaries with absolute paths in `mcp.json` to avoid the entire class of problem. This is the recommended approach for all downstream MCP servers (gitnexus, brave-search, context7, etc.) [@npx_bug_doc].
 
 ## Related
 

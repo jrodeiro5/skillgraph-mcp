@@ -28,7 +28,23 @@ Do not write pages that restate nearby code.
 ## Topic Taxonomy
 
 Topics live in `topics.yaml`. Pages are Markdown files directly under
-`almanac/`, including nested folders.
+`almanac/`, including nested folders. The taxonomy is currently `concepts` ->
+`architecture` -> `gotchas`, reflecting a small wiki where architecture
+knowledge and its operational pitfalls are the main content so far.
+
+## Pages
+
+- [Gateway Routing Model](architecture/gateway-routing) — the 8 gateway tools
+  and the `execute_code` indirection point that keeps downstream tool schemas
+  out of the agent's context until asked for.
+- [Embedding-Based Retrieval](architecture/embedding-retrieval) — the
+  `find_tools` semantic search index, its provider resolution, and the
+  benchmark deciding whether it replaces typed-graph retrieval.
+- [npx Cache Corruption (npm 11.x)](guides/npx-cache-corruption) — what to do
+  when a downstream MCP server launched via `npx` in `mcp.json` dead-ends with
+  `Cannot destructure property 'package' of 'node.target' as it is null`. This
+  is an npm 11.x cache-corruption bug, not a skillgraph-mcp or downstream-server
+  bug, and it recurs whenever a new npx-launched server is added.
 
 ## Links
 

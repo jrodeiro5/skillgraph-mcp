@@ -49,3 +49,4 @@ The Python sandbox uses [gomonty](https://github.com/ewhauser/gomonty) to wrap a
 ## Related
 
 - [Embedding-Based Retrieval](embedding-retrieval) — how `find_tools` [@find_tools] uses semantic search to find tools without reading all signatures
+- [npx Cache Corruption (npm 11.x)](../guides/npx-cache-corruption) — when a downstream server registered here fails to connect, `validate` shows it as failed and the rest of the graph still comes up; a cryptic `node.target` npm error at connect time is this bug, not a routing bug

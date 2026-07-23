@@ -1,0 +1,67 @@
+almanac/topics.yaml
+  s_c26fcc993ac3c0::t_498f1bb20798ab 6-13
+  s_c26fcc993ac3c0::t_5497ee6c0eaa61 1-5
+almanac/architecture/embedding-retrieval.md
+  s_c26fcc993ac3c0::t_b6c1ed9cfcd7ff 1-18,20-33,35-37,39-43,45,47,49,51-64
+  s_c26fcc993ac3c0::t_6e1ecc1463988f 19,34,38,44,46,48,50
+almanac/guides/npx-cache-corruption.md
+  s_c26fcc993ac3c0::t_9b3d38e6d9f64e 1-17,19-42,44-46,48-51
+  s_c26fcc993ac3c0::t_af9330f3a7c5c4 47
+  s_c26fcc993ac3c0::t_1f55eb1d41c10f 18,43
+almanac/architecture/gateway-routing.md
+  s_c26fcc993ac3c0::t_8aab4727f09c97 51
+  s_c26fcc993ac3c0::t_66e9a0e14b0db0 1-17,19-32,34-44,46,48-50
+  s_c26fcc993ac3c0::t_38f81085701bdc 18,33,45,47
+almanac/README.md
+  s_99c1f4bae39aeb::t_8eff944945f362 1-35
+almanac/manual/README.md
+  s_99c1f4bae39aeb::t_104f8beeea9c0f 1-68
+almanac/manual/architecture.md
+  s_99c1f4bae39aeb::t_6fd744569e2787 1-49
+almanac/manual/concepts.md
+  s_99c1f4bae39aeb::t_e2529713e6d52d 1-32
+almanac/manual/decisions.md
+  s_99c1f4bae39aeb::t_e1220886a65106 1-45
+almanac/manual/evidence.md
+  s_99c1f4bae39aeb::t_12be337a6f7539 1-57
+almanac/manual/garden.md
+  s_99c1f4bae39aeb::t_fba4575a2b69e3 1-20
+almanac/manual/how-to-guides.md
+  s_99c1f4bae39aeb::t_cae7bc76fc3005 1-62
+almanac/manual/how-to-write.md
+  s_99c1f4bae39aeb::t_6ab0f4d4edec51 1-117
+almanac/manual/ingest.md
+  s_99c1f4bae39aeb::t_49a0609e57a888 1-17
+almanac/manual/links.md
+  s_99c1f4bae39aeb::t_ccef5ce503e57b 1-71
+almanac/manual/reference.md
+  s_99c1f4bae39aeb::t_334cba4be212e7 1-38
+almanac/manual/sources.md
+  s_99c1f4bae39aeb::t_dd609e828e5938 1-18
+almanac/manual/topics.md
+  s_99c1f4bae39aeb::t_f9cbd61cd54f05 1-139
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.15",
+  "base_commit_sha": "4e54054c7afe0a204ec40c471374c875effa052f",
+  "prompts": {},
+  "sessions": {
+    "s_99c1f4bae39aeb": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "68739f8d-8aab-4cb5-b90f-82970ffaae7b",
+        "model": "unknown"
+      },
+      "human_author": "jrodeiro5 <jrodeiro.dev@gmail.com>"
+    },
+    "s_c26fcc993ac3c0": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f9004-7e62-7e13-92ce-a72aa5b82b19",
+        "model": "gpt-5.4-mini"
+      },
+      "human_author": "jrodeiro5 <jrodeiro.dev@gmail.com>"
+    }
+  }
+}

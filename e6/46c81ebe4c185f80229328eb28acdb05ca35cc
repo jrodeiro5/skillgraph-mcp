@@ -1,0 +1,56 @@
+almanac/architecture/gateway-routing.md
+  s_449325703f9e5b::t_0b3f61a0c96f73 9-13,19,21,23,29-33,39,55-68,71
+  s_1eb63528b4ed89::t_40291eb967720b 3,27
+almanac/concepts/execute-code-sandbox.md
+  s_1eb63528b4ed89::t_42108772d663de 11,37
+  s_449325703f9e5b::t_31d68958e47f06 1-10,12-36,38-59
+almanac/architecture/graph.md
+  s_1eb63528b4ed89::t_ee7c7bdf99fb26 3
+  s_449325703f9e5b::t_20dfd63272e595 1-2,4-48
+almanac/architecture/refine.md
+  s_1eb63528b4ed89::t_40291eb967720b 3,10
+  s_449325703f9e5b::t_20dfd63272e595 1-2,4-9,11-74
+almanac/architecture/mcpserver.md
+  s_449325703f9e5b::t_20dfd63272e595 1-15,19-65
+  s_706f5c59e8f6ae::t_a2097221e675b7 16-17
+  s_1eb63528b4ed89::t_ee7c7bdf99fb26 18
+almanac/architecture/lattice.md
+  s_449325703f9e5b::t_20dfd63272e595 1-2,4-19,21-55
+  s_1eb63528b4ed89::t_40291eb967720b 3,20
+almanac/architecture/config.md
+  s_1eb63528b4ed89::t_40291eb967720b 3,32,37
+  s_706f5c59e8f6ae::t_2a30ce9a1763be 36
+  s_449325703f9e5b::t_20dfd63272e595 1-2,4-31,33-35,38-59
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.23",
+  "base_commit_sha": "e646c81ebe4c185f80229328eb28acdb05ca35cc",
+  "prompts": {},
+  "sessions": {
+    "s_1eb63528b4ed89": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a024d7-e803-7df2-aa8a-80b71b805eb3",
+        "model": "gpt-5.4-mini"
+      },
+      "human_author": "jrodeiro5 <jrodeiro.dev@gmail.com>"
+    },
+    "s_449325703f9e5b": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019ff7d3-27d3-7a22-8978-6071edf1543a",
+        "model": "gpt-5.4-mini"
+      },
+      "human_author": "jrodeiro5 <jrodeiro.dev@gmail.com>"
+    },
+    "s_706f5c59e8f6ae": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a01963-f3a6-7203-a7a1-d240d8e0605e",
+        "model": "gpt-5.4-mini"
+      },
+      "human_author": "jrodeiro5 <jrodeiro.dev@gmail.com>"
+    }
+  }
+}

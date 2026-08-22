@@ -1,0 +1,19 @@
+.openwikiignore
+  s_51001271d44717::t_058b14fa4adf91 1-20
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.23",
+  "base_commit_sha": "1ba8e54c2e322c2e803fc5420e3eba0244ffcbf1",
+  "prompts": {},
+  "sessions": {
+    "s_51001271d44717": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c746dd7b-2518-4809-a88a-2c29aee40a52",
+        "model": "claude-opus-5"
+      },
+      "human_author": "jrodeiro5 <jrodeiro.dev@gmail.com>"
+    }
+  }
+}

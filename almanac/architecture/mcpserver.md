@@ -63,3 +63,9 @@ All `Manager` methods that read or modify state use a `sync.RWMutex`.
   that bypass the normal connection flow. Use them only in tests.
 - `Close()` must be called to clean up all server connections. The `cmd/serve.go`
   entry point uses `defer mgr.Close()` to ensure cleanup on exit.
+
+## Related
+
+- [Graph](graph) — the `Manager` maintains the capability graph and rebuilds it via `RebuildGraph()`.
+- [Refinement Engine](refine) — the refine package is tightly coupled to `Manager` and calls `RebuildGraph()`.
+- [Config Persistence](config) — `NewManager()` populates the graph from config.

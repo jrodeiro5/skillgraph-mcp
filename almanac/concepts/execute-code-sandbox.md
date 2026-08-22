@@ -1,6 +1,6 @@
 ---
 title: Execute Code Sandbox
-topics: [concepts, architecture]
+topics: [concepts, architecture, gateway]
 sources:
   - {id: execute_code, type: file, path: internal/tools/execute_code.go}
   - {id: trace_pkg, type: file, path: internal/trace/trace.go}
@@ -57,3 +57,8 @@ synchronously (not async) to avoid race conditions with process exit [@trace_pkg
 - The `ToolCallTrace` and `Trajectory` types are duplicated in
   `tools/execute_code.go` and `refine/engine.go`. They are compatible via
   JSON marshaling but should not be consolidated (it would create an import cycle).
+
+## Related
+
+- [Trajectories](trajectories) — each `execute_code` call produces a trajectory record.
+- [Gateway Routing Model](../architecture/gateway-routing) — `execute_code` is one of the 9 gateway tools.

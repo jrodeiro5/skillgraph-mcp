@@ -53,3 +53,8 @@ scoped packages (`@scope/package`) and version suffixes.
   only.
 - The lattice is regenerated after every graph rebuild (via SkillOpt or manual
   edits). Manual edits to lattice files will be overwritten.
+
+## Related
+
+- [Refinement Engine](refine) — the bootstrap loop writes READMEs into `.mcp_lattice/` and the SkillOpt loop reads trajectory files from it.
+- [Execute Code Sandbox](../concepts/execute-code-sandbox) — trajectory files are written under `.mcp_lattice/traces/`.

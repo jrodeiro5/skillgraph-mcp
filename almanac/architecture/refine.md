@@ -72,3 +72,10 @@ Without any of these, both loops silently skip.
   isn't available within that window, the loop proceeds with tools only.
 - The SkillOpt hold-out gate rejects description edits that regress routing
   accuracy on historical traces. With no hold-out data, every edit is accepted.
+
+## Related
+
+- [Config Persistence](config) — the loops populate and optimize the `skillGraph` section of `mcp.json`.
+- [Semantic Lattice](lattice) — the bootstrap writes READMEs and SkillOpt reads traces from `.mcp_lattice/`.
+- [MCP Server Manager](mcpserver) — the loops call `mgr.RebuildGraph()` after merging edits.
+- [Trajectories](../concepts/trajectories) — the SkillOpt loop parses trajectory files to propose edits.

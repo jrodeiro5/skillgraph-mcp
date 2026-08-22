@@ -46,3 +46,9 @@ are collapsed to spaces so multi-line tool docs don't break the layout.
   everything rebuilds from them.
 - Rebuilding the graph is expensive for large tool counts because it re-resolves
   all downstream tools and re-infers relations.
+
+## Related
+
+- [MCP Server Manager](mcpserver) — the `Manager` builds the graph at startup and rebuilds it atomically via `RebuildGraph()`.
+- [Refinement Engine](refine) — the SkillOpt loop calls `RebuildGraph()` after merging optimized relations.
+- [Gateway Routing Model](gateway-routing) — every gateway tool reads from this single graph.

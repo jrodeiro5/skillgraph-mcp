@@ -57,3 +57,8 @@ This section is mutated at runtime by background goroutines. Never parse
   cycle.
 - Atomic writes use `<path>.tmp` as the temp file. If the process crashes
   during a write, the temp file remains and must be cleaned up manually.
+
+## Related
+
+- [Refinement Engine](refine) — the bootstrap and SkillOpt loops populate and optimize the `skillGraph` section described here.
+- [MCP Server Manager](mcpserver) — `NewManager()` loads config and populates the graph.

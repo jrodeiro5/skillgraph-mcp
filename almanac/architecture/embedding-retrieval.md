@@ -1,6 +1,6 @@
 ---
 title: Embedding-Based Retrieval
-topics: [architecture]
+topics: [architecture, gateway]
 sources:
   - {id: embed_pkg, type: file, path: internal/embed/embed.go}
   - {id: find_tools, type: file, path: internal/tools/find_tools.go}
@@ -61,4 +61,4 @@ The decision rule for the benchmark:
 
 ## Related
 
-- [Gateway Routing Model](gateway-routing) — how `find_tools` fits into the 8 gateway tools
+- [Gateway Routing Model](gateway-routing) — how `find_tools` fits into the 9 gateway tools

@@ -1,0 +1,52 @@
+almanac/architecture/config.md
+  s_7ba6bec7ca5821::t_d74cb2732079a9 60-64
+almanac/concepts/trajectories.md
+  s_449325703f9e5b::t_7c12243f4d2706 1-2,4-15,18-50
+  s_7ba6bec7ca5821::t_d74cb2732079a9 3,51-55
+  s_706f5c59e8f6ae::t_a2097221e675b7 16-17
+almanac/architecture/embedding-retrieval.md
+  s_706f5c59e8f6ae::t_2a37ce33b3cec7 64
+  s_7ba6bec7ca5821::t_d74cb2732079a9 3
+almanac/architecture/mcpserver.md
+  s_7ba6bec7ca5821::t_d74cb2732079a9 66-71
+almanac/concepts/execute-code-sandbox.md
+  s_7ba6bec7ca5821::t_d74cb2732079a9 3,60-64
+almanac/architecture/refine.md
+  s_7ba6bec7ca5821::t_d74cb2732079a9 75-81
+almanac/architecture/graph.md
+  s_7ba6bec7ca5821::t_d74cb2732079a9 49-54
+almanac/architecture/lattice.md
+  s_7ba6bec7ca5821::t_d74cb2732079a9 56-60
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.23",
+  "base_commit_sha": "e6529e4d17db520b27b3dd7ace260b422541c5d1",
+  "prompts": {},
+  "sessions": {
+    "s_449325703f9e5b": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019ff7d3-27d3-7a22-8978-6071edf1543a",
+        "model": "gpt-5.4-mini"
+      },
+      "human_author": "jrodeiro5 <jrodeiro.dev@gmail.com>"
+    },
+    "s_706f5c59e8f6ae": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a01963-f3a6-7203-a7a1-d240d8e0605e",
+        "model": "gpt-5.4-mini"
+      },
+      "human_author": "jrodeiro5 <jrodeiro.dev@gmail.com>"
+    },
+    "s_7ba6bec7ca5821": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0290e-2748-7b82-9968-cb99c114b950",
+        "model": "gpt-5.4-mini"
+      },
+      "human_author": "jrodeiro5 <jrodeiro.dev@gmail.com>"
+    }
+  }
+}

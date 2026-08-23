@@ -29,6 +29,8 @@ The `internal/embed` package provides embedding-based tool retrieval. It embeds 
 
 Optional: `EMBED_DIMENSIONS` (e.g., `256`) enables Matryoshka dimension reduction for OpenAI models.
 
+Each branch also honors `EMBED_MODEL`, which overrides the stated default model (`nomic-embed-text` for Ollama, `text-embedding-3-small` for OpenAI) [@embed_pkg].
+
 ### Index Lifecycle
 
 At boot, `cmd/serve.go` calls `embed.ResolveConfig()` and builds the embedding index synchronously [@serve_embedding]. On config change, the index rebuilds.

@@ -1,0 +1,19 @@
+almanac/architecture/embedding-retrieval.md
+  s_b7f925812e18c4::t_269f727a063575 32-33
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.23",
+  "base_commit_sha": "0994484b83a832224a738ce8443813cd6f2870d7",
+  "prompts": {},
+  "sessions": {
+    "s_b7f925812e18c4": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a02ee7-0e92-7981-96a2-1a79eed4075a",
+        "model": "gpt-5.4-mini"
+      },
+      "human_author": "jrodeiro5 <jrodeiro.dev@gmail.com>"
+    }
+  }
+}

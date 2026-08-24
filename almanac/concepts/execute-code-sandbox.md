@@ -54,9 +54,7 @@ synchronously (not async) to avoid race conditions with process exit [@trace_pkg
 - Trajectory files are written synchronously. This is sub-millisecond on any
   sane filesystem but means a crash during a large tool response could
   leave a partial trace file.
-- The `ToolCallTrace` and `Trajectory` types are duplicated in
-  `tools/execute_code.go` and `refine/engine.go`. They are compatible via
-  JSON marshaling but should not be consolidated (it would create an import cycle).
+- `Trajectory` and `ToolCallTrace` are defined once in `internal/trace/trace.go` [@trace_pkg] and imported by both `execute_code.go` and `refine/engine.go`. There is no duplication and no import cycle.
 
 ## Related
 

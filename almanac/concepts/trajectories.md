@@ -41,9 +41,7 @@ type Trajectory struct {
 
 ## Gotchas
 
-- The `ToolCallTrace` and `Trajectory` types are defined identically in both
-  `tools/execute_code.go` and `refine/engine.go`. They are compatible via
-  JSON marshaling but should not be consolidated (it would create an import cycle).
+- `Trajectory` and `ToolCallTrace` are defined once in `internal/trace/trace.go` [@trace_pkg] and imported by both `execute_code.go` and `refine/engine.go`. The duplication is already resolved, so no consolidation is needed.
 - Trajectory files are named with nanosecond timestamps and a random number,
   so lexicographic sort equals chronological sort.
 - The SkillOpt loop batches up to 10 trajectory files per optimization cycle.

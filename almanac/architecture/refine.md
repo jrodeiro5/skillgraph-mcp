@@ -3,6 +3,7 @@ title: Refinement Engine
 topics: [architecture, refinement]
 sources:
   - {id: refine_pkg, type: file, path: internal/refine/engine.go}
+  - {id: trace_pkg, type: file, path: internal/trace/trace.go}
 ---
 
 # Refinement Engine
@@ -62,9 +63,9 @@ Without any of these, both loops silently skip.
 
 - The refine package directly calls `mcpserver.RebuildGraph`, `mcpserver.AllTools`,
   and `mcpserver.ServerTools` — it is tightly coupled to `Manager`'s concrete type.
-- `ToolCallTrace`/`Trajectory` are defined identically in both
-  `tools/execute_code.go` and `refine/engine.go`. They're compatible via JSON
-  marshaling. Do not consolidate without also fixing the import cycle.
+- `Trajectory` and `ToolCallTrace` are defined once in `internal/trace/trace.go`
+ [@trace_pkg] and imported by both `tools/execute_code.go` and `refine/engine.go`. The
+ duplication is already resolved, so there is no import cycle to fix.
 - `.mcp_lattice/` is hardcoded as `"./.mcp_lattice"` in both
   `execute_code.go` and `refine/engine.go`. Running the binary from different
   directories scatters traces.

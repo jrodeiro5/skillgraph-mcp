@@ -52,7 +52,7 @@ Every 30 seconds, the SkillOpt loop:
 
 Providers are detected in priority order:
 
-1. `LLM_BASE_URL` set → OpenAI-compatible (default model: `gpt-5.4-nano`)
+1. `LLM_BASE_URL` set → OpenAI-compatible endpoint. Auth reads `LLM_API_KEY`; the model is `LLM_MODEL` if set, otherwise `gpt-5.4-nano`
 2. `OPENAI_API_KEY` → OpenAI
 3. `DEEPSEEK_API_KEY` → DeepSeek (`deepseek-v4-flash`)
 4. `GEMINI_API_KEY` → Gemini (`gemini-3.1-flash-lite`)

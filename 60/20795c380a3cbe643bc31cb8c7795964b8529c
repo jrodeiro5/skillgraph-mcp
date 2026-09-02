@@ -1,0 +1,28 @@
+almanac/architecture/gateway-routing.md
+  s_4c4c9fe0f88ae6::t_4e79ba6fa6a881 55
+  s_fbb7e10ef978f2::t_4f35fe4785160f 71-76
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.0",
+  "base_commit_sha": "6020795c380a3cbe643bc31cb8c7795964b8529c",
+  "prompts": {},
+  "sessions": {
+    "s_4c4c9fe0f88ae6": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a05b07-676c-7401-b5e3-9a953c815c4a",
+        "model": "gpt-5.4-mini"
+      },
+      "human_author": "jrodeiro5 <jrodeiro.dev@gmail.com>"
+    },
+    "s_fbb7e10ef978f2": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a06352-590e-7f42-b334-9bf73f6fc3d2",
+        "model": "gpt-5.4-mini"
+      },
+      "human_author": "jrodeiro5 <jrodeiro.dev@gmail.com>"
+    }
+  }
+}

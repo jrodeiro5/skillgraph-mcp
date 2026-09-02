@@ -52,7 +52,7 @@ The Python sandbox uses [gomonty](https://github.com/ewhauser/gomonty) to wrap a
 
 `list_skills` enumerates all downstream MCP servers and their instructions [@list_skills]. `use_skill` returns the Python function signatures for a specific server, which can then be called inside `execute_code` [@use_skill].
 
-`find_tools` provides semantic search over all downstream tools, returning the top-k most relevant results for a natural language query [@find_tools]. It requires an embedding provider (Ollama or OpenAI) and falls back to keyword scoring when no provider is configured.
+ `find_tools` provides semantic search over all downstream tools, returning the top-k most relevant results for a natural language query [@find_tools]. It requires an embedding provider (Ollama or OpenAI). When no provider is configured the index is unavailable and `find_tools` returns a helpful error directing the agent to fall back to `list_skills` + `use_skill` — there is no keyword-scoring fallback [@find_tools].
 
 ## Graph-Based Planning
 
@@ -68,5 +68,10 @@ The Python sandbox uses [gomonty](https://github.com/ewhauser/gomonty) to wrap a
 
 ## Related
 
-- [Embedding-Based Retrieval](embedding-retrieval) — how `find_tools` uses semantic search to find tools without reading all signatures
+- [Graph](graph) — the capability graph every gateway tool reads from; `get_skill_graph` returns it and `plan_workflow` plans tool sequences over it
+- [MCP Server Manager](mcpserver) — connects to servers and builds and rebuilds the capability graph
+- [Config Persistence](config) — `mcp.json` is what the gateway loads servers and the skill graph from
+- [Refinement Engine](refine) — the bootstrap and SkillOpt loops populate and optimize the skill graph at runtime
+- [Semantic Lattice](lattice) — generated documentation and trajectory storage under `.mcp_lattice/`
+- [Execute Code Sandbox](../concepts/execute-code-sandbox) — the sandbox that wraps each downstream tool as a Python function
 - [npx Cache Corruption (npm 11.x)](../guides/npx-cache-corruption) — when a downstream server registered here fails to connect, `validate` shows it as failed and the rest of the graph still comes up; a cryptic `node.target` npm error at connect time is this bug, not a routing bug

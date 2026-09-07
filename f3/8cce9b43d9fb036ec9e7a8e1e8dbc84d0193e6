@@ -1,0 +1,27 @@
+almanac/architecture/lattice.md
+  s_4c3d62bfc7ace8::t_c092ae8e6a61ae 35-36,60
+  s_4c3d62bfc7ace8::t_06dce907c5fd1a 46
+  s_4c3d62bfc7ace8::t_5dcd0b56bc853e 6-9,32-34,37-45,47-59,61-62
+  s_4c3d62bfc7ace8::t_79851da6e38096 63
+almanac/architecture/refine.md
+  s_4c3d62bfc7ace8::t_544b9e5c963766 7,70-71,73
+  s_4c3d62bfc7ace8::t_c092ae8e6a61ae 72
+almanac/concepts/execute-code-sandbox.md
+  s_4c3d62bfc7ace8::t_544b9e5c963766 7,37-40
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.2",
+  "base_commit_sha": "f38cce9b43d9fb036ec9e7a8e1e8dbc84d0193e6",
+  "prompts": {},
+  "sessions": {
+    "s_4c3d62bfc7ace8": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a07d72-b186-7f23-97e3-eb135882ffe1",
+        "model": "gpt-5.4-mini"
+      },
+      "human_author": "jrodeiro5 <jrodeiro.dev@gmail.com>"
+    }
+  }
+}

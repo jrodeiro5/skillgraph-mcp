@@ -3,6 +3,10 @@ title: Semantic Lattice
 topics: [architecture, lattice]
 sources:
   - {id: lattice_pkg, type: file, path: internal/docs/lattice.go}
+  - {id: lattice_dir_adr, type: file, path: docs/adr/0002-default-lattice-dir-outside-cwd.md}
+  - {id: lattice_dir_util, type: file, path: cmd/util.go}
+  - {id: serve_lattice, type: file, path: cmd/serve.go, note: --lattice-dir default}
+  - {id: refine_snapshot, type: file, path: internal/refine/engine.go, note: history snapshot + rollback}
 ---
 
 # Semantic Lattice
@@ -24,6 +28,38 @@ gateway at boot and regenerated whenever the graph changes. It lives at
 3. Writes `relations.md` with the compact graph representation
 4. Spawns background goroutines to fetch READMEs from GitHub for HTTP/SSE
    servers, or from NPM for stdio servers using `npx`
+
+## Directory
+
+The lattice directory is resolved by `defaultLatticeDir()` (`cmd/util.go`) and
+threaded through `--lattice-dir` from `cmd/serve.go` [@serve_lattice] — it is not hardcoded in
+the gateway [@lattice_dir_adr]. By default the path is
+`os.UserCacheDir()/skillgraph-mcp/lattice`:
+
+| OS | Default location |
+|---|---|
+| macOS | `$HOME/Library/Caches/skillgraph-mcp/lattice` |
+| Linux | `$XDG_CACHE_HOME/skillgraph-mcp/lattice` or `~/.cache/skillgraph-mcp/lattice` |
+| Windows | `%LocalAppData%\skillgraph-mcp\lattice` |
+
+If `os.UserCacheDir()` fails (e.g. `$HOME` unset), it falls back to the
+CWD-relative `./.mcp_lattice` and logs a warning [@lattice_dir_util]. The CWD-relative path
+remains reachable explicitly via `--lattice-dir ./.mcp_lattice` (debug, tests,
+ephemeral runs). Because the default is a per-user cache path, running the
+binary from different working directories no longer scatters traces across
+them.
+
+The directory holds `skills.md`, `relations.md`, per-server `<server>_readme.md`
+(or a `.noreadme` sentinel), trajectory files under `traces/`, and rollback
+snapshots under `history/`.
+
+## Rollback Snapshots
+
+Before each SkillOpt edit the refine engine writes a snapshot of `mcp.json`'s
+`skillGraph` section to `<latticeDir>/history/skillgraph_*.json` and trims
+`history/` to the 5 most recent [@refine_snapshot]. If an edit fails the
+1.5x rollback gate, `rollbackToLatestSnapshot()` restores the most recent
+snapshot.
 
 ## README Fetching
 

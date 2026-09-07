@@ -4,6 +4,7 @@ topics: [architecture, refinement]
 sources:
   - {id: refine_pkg, type: file, path: internal/refine/engine.go}
   - {id: trace_pkg, type: file, path: internal/trace/trace.go}
+  - {id: lattice_dir_util, type: file, path: cmd/util.go}
 ---
 
 # Refinement Engine
@@ -66,9 +67,10 @@ Without any of these, both loops silently skip.
 - `Trajectory` and `ToolCallTrace` are defined once in `internal/trace/trace.go`
  [@trace_pkg] and imported by both `tools/execute_code.go` and `refine/engine.go`. The
  duplication is already resolved, so there is no import cycle to fix.
-- `.mcp_lattice/` is hardcoded as `"./.mcp_lattice"` in both
-  `execute_code.go` and `refine/engine.go`. Running the binary from different
-  directories scatters traces.
+- The lattice directory is resolved by `defaultLatticeDir()` (`cmd/util.go`)
+  to a per-user cache path by default, and the CWD-relative `./.mcp_lattice`
+  is reachable only via `--lattice-dir` [@lattice_dir_util]. Traces
+  therefore no longer scatter across working directories.
 - The bootstrap loop's 15-second README timeout is a hard limit. If a README
   isn't available within that window, the loop proceeds with tools only.
 - The SkillOpt hold-out gate rejects description edits that regress routing

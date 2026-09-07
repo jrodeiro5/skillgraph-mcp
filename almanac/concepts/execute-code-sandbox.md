@@ -4,6 +4,7 @@ topics: [concepts, architecture, gateway]
 sources:
   - {id: execute_code, type: file, path: internal/tools/execute_code.go}
   - {id: trace_pkg, type: file, path: internal/trace/trace.go}
+  - {id: lattice_dir_util, type: file, path: cmd/util.go}
 ---
 
 # Execute Code Sandbox
@@ -33,8 +34,10 @@ Every `execute_code` call produces a `Trajectory` record containing:
 - `output` — the final output if no error
 - `error` — the error message if the call failed
 
-These trajectories are written to `.mcp_lattice/traces/<timestamp>_<rand>.json`
-synchronously (not async) to avoid race conditions with process exit [@trace_pkg].
+These trajectories are written to `<latticeDir>/traces/<timestamp>_<rand>.json`
+(synchronously, not async) to avoid race conditions with process exit. With the
+default `--lattice-dir`, that resolves to the user cache dir, e.g.
+`$HOME/Library/Caches/skillgraph-mcp/lattice/traces/` [@trace_pkg] [@lattice_dir_util].
 
 ## Safety
 

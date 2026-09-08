@@ -81,9 +81,11 @@ scoped packages (`@scope/package`) and version suffixes.
 
 ## Gotchas
 
-- The lattice directory is hardcoded as `"./.mcp_lattice"` in both
-  `execute_code.go` and `refine/engine.go`. Running the binary from different
-  directories scatters traces.
+- The lattice directory is resolved by `defaultLatticeDir()` (`cmd/util.go`) to
+  a per-user cache path by default, so running the binary from different
+  working directories no longer scatters traces. The CWD-relative
+  `./.mcp_lattice` is reachable only via `--lattice-dir`, and as a fallback
+  when `os.UserCacheDir()` fails (for example, `$HOME` unset) [@lattice_dir_util].
 - README fetching happens in background goroutines. The bootstrap refinement
   loop waits up to 15 seconds for each README before proceeding with tools
   only.

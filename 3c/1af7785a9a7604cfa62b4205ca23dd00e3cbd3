@@ -1,0 +1,19 @@
+almanac/architecture/lattice.md
+  s_492b26f87ef95f::t_8df33583e10ecd 84-88
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.2",
+  "base_commit_sha": "3c1af7785a9a7604cfa62b4205ca23dd00e3cbd3",
+  "prompts": {},
+  "sessions": {
+    "s_492b26f87ef95f": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a08255-6f81-76a2-aaf6-44185748bff3",
+        "model": "gpt-5.4-mini"
+      },
+      "human_author": "jrodeiro5 <jrodeiro.dev@gmail.com>"
+    }
+  }
+}

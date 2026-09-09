@@ -62,3 +62,5 @@ This section is mutated at runtime by background goroutines. Never parse
 
 - [Refinement Engine](refine) — the bootstrap and SkillOpt loops populate and optimize the `skillGraph` section described here.
 - [MCP Server Manager](mcpserver) — `NewManager()` loads config and populates the graph.
+
+- [Public API and Versioning](../decisions/public-api-and-versioning) — ADR-0003's four public-API surfaces; per its own rule, renaming or removing a gateway tool is a major bump.

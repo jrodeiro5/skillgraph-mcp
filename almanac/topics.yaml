@@ -3,6 +3,10 @@ topics:
     title: Concepts
     description: Core vocabulary and mental models for this codebase
     parents: []
+  - slug: decisions
+    title: Decisions
+    description: Architecturally meaningful choices and their consequences
+    parents: []
   - slug: architecture
     title: Architecture
     description: System architecture, components, and design decisions
@@ -10,4 +14,24 @@ topics:
   - slug: gotchas
     title: Gotchas
     description: Known issues, bugs, and operational pitfalls
+    parents: [architecture]
+  - slug: gateway
+    title: Gateway Tools
+    description: The 9 gateway tools and routing model
+    parents: [architecture]
+  - slug: refinement
+    title: Refinement & Optimization
+    description: Bootstrap and SkillOpt background loops
+    parents: [architecture]
+  - slug: config
+    title: Configuration
+    description: mcp.json schema, persistence, and runtime mutation
+    parents: [architecture]
+  - slug: lattice
+    title: Semantic Lattice
+    description: Generated documentation and trajectory storage
+    parents: [architecture]
+  - slug: graph
+    title: Graph Model
+    description: In-memory capability graph, nodes, and edges
     parents: [architecture]

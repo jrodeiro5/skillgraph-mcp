@@ -96,3 +96,5 @@ scoped packages (`@scope/package`) and version suffixes.
 
 - [Refinement Engine](refine) — the bootstrap loop writes READMEs into `.mcp_lattice/` and the SkillOpt loop reads trajectory files from it.
 - [Execute Code Sandbox](../concepts/execute-code-sandbox) — trajectory files are written under `.mcp_lattice/traces/`.
+
+- [Public API and Versioning](../decisions/public-api-and-versioning) — ADR-0003's four public-API surfaces; per its own rule, renaming or removing a gateway tool is a major bump.

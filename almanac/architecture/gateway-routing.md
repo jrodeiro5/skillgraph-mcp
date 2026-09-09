@@ -75,3 +75,5 @@ The Python sandbox uses [gomonty](https://github.com/ewhauser/gomonty) to wrap a
 - [Semantic Lattice](lattice) — generated documentation and trajectory storage under `.mcp_lattice/`
 - [Execute Code Sandbox](../concepts/execute-code-sandbox) — the sandbox that wraps each downstream tool as a Python function
 - [npx Cache Corruption (npm 11.x)](../guides/npx-cache-corruption) — when a downstream server registered here fails to connect, `validate` shows it as failed and the rest of the graph still comes up; a cryptic `node.target` npm error at connect time is this bug, not a routing bug
+
+- [Public API and Versioning](../decisions/public-api-and-versioning) — ADR-0003's four public-API surfaces; per its own rule, renaming or removing a gateway tool is a major bump.

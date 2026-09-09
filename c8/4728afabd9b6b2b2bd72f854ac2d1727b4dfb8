@@ -1,0 +1,57 @@
+almanac/architecture/lattice.md
+  s_ce35e521105b60::t_c13da1037268f7 99-100
+almanac/decisions/public-api-and-versioning.md
+  s_ce35e521105b60::t_576e2eac297b3a 1-86
+almanac/topics.yaml
+  s_449325703f9e5b::t_f4c339a291d993 18-36
+  s_ce35e521105b60::t_c13da1037268f7 6-9
+  s_1eb63528b4ed89::t_8e6905a5c83408 37
+almanac/architecture/config.md
+  s_ce35e521105b60::t_c13da1037268f7 65-66
+almanac/architecture/gateway-routing.md
+  s_ce35e521105b60::t_c13da1037268f7 78-79
+almanac/README.md
+  s_492b26f87ef95f::t_3391f3a0d212ea 83
+  s_449325703f9e5b::t_b299eb614d892d 31-40,44-46,52-71
+  s_ce35e521105b60::t_c13da1037268f7 73,78-82
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.2",
+  "base_commit_sha": "c84728afabd9b6b2b2bd72f854ac2d1727b4dfb8",
+  "prompts": {},
+  "sessions": {
+    "s_1eb63528b4ed89": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a024d7-e803-7df2-aa8a-80b71b805eb3",
+        "model": "gpt-5.4-mini"
+      },
+      "human_author": "jrodeiro5 <jrodeiro.dev@gmail.com>"
+    },
+    "s_449325703f9e5b": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019ff7d3-27d3-7a22-8978-6071edf1543a",
+        "model": "gpt-5.4-mini"
+      },
+      "human_author": "jrodeiro5 <jrodeiro.dev@gmail.com>"
+    },
+    "s_492b26f87ef95f": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a08255-6f81-76a2-aaf6-44185748bff3",
+        "model": "gpt-5.4-mini"
+      },
+      "human_author": "jrodeiro5 <jrodeiro.dev@gmail.com>"
+    },
+    "s_ce35e521105b60": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a08753-dd5e-7df1-ba60-f7494e7a9a8f",
+        "model": "gpt-5.4-mini"
+      },
+      "human_author": "jrodeiro5 <jrodeiro.dev@gmail.com>"
+    }
+  }
+}

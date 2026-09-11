@@ -1,0 +1,21 @@
+almanac/architecture/README.md
+  s_824cd022d1aba6::t_40a71f7bda6d9c 1-47
+almanac/README.md
+  s_824cd022d1aba6::t_04f78d904fa69c 46-47
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "af0b13b24b5ee7bf7a84e9b83d16dee87d2b08bf",
+  "prompts": {},
+  "sessions": {
+    "s_824cd022d1aba6": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a091be-4cb4-7a23-9b14-a35d0550f603",
+        "model": "gpt-5.4-mini"
+      },
+      "human_author": "jrodeiro5 <jrodeiro.dev@gmail.com>"
+    }
+  }
+}

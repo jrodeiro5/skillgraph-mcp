@@ -43,6 +43,8 @@ Topics live in `topics.yaml`. Pages are Markdown files directly under
 
 ### Architecture
 
+Read the cluster in dependency order via the [Architecture hub](architecture).
+
 - [Gateway Routing Model](architecture/gateway-routing) — the 9 gateway tools
   and the `execute_code` indirection point that keeps downstream tool schemas
   out of the agent's context until asked for.

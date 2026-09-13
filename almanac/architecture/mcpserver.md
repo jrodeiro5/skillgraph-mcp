@@ -1,6 +1,6 @@
 ---
 title: MCP Server Manager
-topics: [architecture]
+topics: [architecture, manager]
 sources:
   - {id: manager_pkg, type: file, path: internal/mcpserver/manager.go}
   - {id: server_pkg, type: file, path: internal/mcpserver/server.go}

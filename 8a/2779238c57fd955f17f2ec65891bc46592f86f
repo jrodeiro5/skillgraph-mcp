@@ -1,0 +1,21 @@
+almanac/topics.yaml
+  s_0d0dde1e9e3b3e::t_9a11d4f0a8a0bb 37-40
+almanac/architecture/mcpserver.md
+  s_0d0dde1e9e3b3e::t_9a11d4f0a8a0bb 3
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "8a2779238c57fd955f17f2ec65891bc46592f86f",
+  "prompts": {},
+  "sessions": {
+    "s_0d0dde1e9e3b3e": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a09c08-5ede-70b0-bd6d-17dadeb92c4b",
+        "model": "gpt-5.4-mini"
+      },
+      "human_author": "jrodeiro5 <jrodeiro.dev@gmail.com>"
+    }
+  }
+}

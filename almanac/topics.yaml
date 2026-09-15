@@ -34,8 +34,8 @@ topics:
   - slug: graph
     title: Graph Model
     description: In-memory capability graph, nodes, and edges
+    parents: [architecture]
   - slug: manager
     title: Manager
     description: Runtime hub connecting downstream servers, resolving tools, and rebuilding the graph
-    parents: [architecture]
     parents: [architecture]

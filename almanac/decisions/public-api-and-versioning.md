@@ -1,6 +1,6 @@
 ---
 title: Public API and Versioning
-topics: [decisions]
+topics: [decisions, versioning]
 sources:
   - {id: adr_0003, type: file, path: docs/adr/0003-versioning-and-public-api-surface.md}
   - {id: root_go, type: file, path: cmd/root.go}

@@ -39,3 +39,7 @@ topics:
     title: Manager
     description: Runtime hub connecting downstream servers, resolving tools, and rebuilding the graph
     parents: [architecture]
+  - slug: versioning
+    title: Public API and Versioning
+    description: Which observable surfaces are stable across releases and the version bump each change requires
+    parents: [decisions]

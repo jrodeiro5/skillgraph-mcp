@@ -38,6 +38,9 @@ Topics live in `topics.yaml`. Pages are Markdown files directly under
     - `config` — mcp.json schema, persistence, and runtime mutation
     - `lattice` — Generated documentation and trajectory storage
     - `graph` — In-memory capability graph, nodes, and edges
+    - `manager` — Runtime hub connecting downstream servers and rebuilding the graph
+  - `decisions` — Architecturally meaningful choices and their consequences
+    - `versioning` — Public-API surfaces and the version bump each change requires
 
 ## Pages
 

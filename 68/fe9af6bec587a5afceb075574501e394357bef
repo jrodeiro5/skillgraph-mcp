@@ -1,0 +1,67 @@
+.agents/skills/gitnexus/gitnexus-impact-analysis/SKILL.md
+  s_1eb63528b4ed89::t_8e6905a5c83408 20,22,26,31,35,58,61,76,79,89
+.gitignore
+  s_4c3d62bfc7ace8::t_afb56c09620a5a 58-61
+  s_d5809ca8528fc6::t_8100a7df4f8d4e 62
+.agents/skills/gitnexus/gitnexus-debugging/SKILL.md
+  s_1eb63528b4ed89::t_8e6905a5c83408 19-20,22,25,31,33,35,43,48,52,55,60,63,69,76-86,90,94
+.agents/skills/gitnexus/gitnexus-exploring/SKILL.md
+  s_1eb63528b4ed89::t_8e6905a5c83408 21-22,26,32,34,50,53,58,61,71,74
+.openwikiignore
+  s_b7f925812e18c4::t_c70c80eddb97c2 21-28
+.agents/skills/gitnexus/gitnexus-cli/SKILL.md
+  s_1eb63528b4ed89::t_8e6905a5c83408 8-10,17,27,29,34,42,55,72
+.agents/skills/gitnexus/gitnexus-refactoring/SKILL.md
+  s_1eb63528b4ed89::t_8e6905a5c83408 19-21,25,32-35,42-43,46,53,55,58,64,67,69,73,76,81,84,90,101,103,109-110,113,115,118
+.agents/skills/gitnexus/gitnexus-guide/SKILL.md
+  s_1eb63528b4ed89::t_8e6905a5c83408 18,38,42-113,130-131,133
+  s_af518142645d43::t_f718f49164e29c 132
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "68fe9af6bec587a5afceb075574501e394357bef",
+  "prompts": {},
+  "sessions": {
+    "s_1eb63528b4ed89": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a024d7-e803-7df2-aa8a-80b71b805eb3",
+        "model": "gpt-5.4-mini"
+      },
+      "human_author": "jrodeiro5 <jrodeiro.dev@gmail.com>"
+    },
+    "s_4c3d62bfc7ace8": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a07d72-b186-7f23-97e3-eb135882ffe1",
+        "model": "gpt-5.4-mini"
+      },
+      "human_author": "jrodeiro5 <jrodeiro.dev@gmail.com>"
+    },
+    "s_af518142645d43": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a14406-f3d5-7971-bc81-954b56953441",
+        "model": "gpt-5.4-mini"
+      },
+      "human_author": "jrodeiro5 <jrodeiro.dev@gmail.com>"
+    },
+    "s_b7f925812e18c4": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a02ee7-0e92-7981-96a2-1a79eed4075a",
+        "model": "gpt-5.4-mini"
+      },
+      "human_author": "jrodeiro5 <jrodeiro.dev@gmail.com>"
+    },
+    "s_d5809ca8528fc6": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8adf1e60-03cb-40e0-9396-68765eb188ac",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "jrodeiro5 <jrodeiro.dev@gmail.com>"
+    }
+  }
+}

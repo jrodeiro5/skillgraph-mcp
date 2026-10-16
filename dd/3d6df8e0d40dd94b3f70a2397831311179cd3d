@@ -1,0 +1,67 @@
+CLAUDE.md
+  s_0dc484e502ace4::t_b1d43c317dbc1d 197-213
+  s_b7f925812e18c4::t_c70c80eddb97c2 126,172,174-177
+  s_c26fcc993ac3c0::t_98641087bedfe2 101-110
+  s_1eb63528b4ed89::t_8e6905a5c83408 167-171,173,178-196,214-216
+  s_d5809ca8528fc6::t_810dd7e36e1881 128,132-133,135-137,141,143-144
+scripts/bootstrap_metadata.py
+  s_b60e4b2c2459cf::t_5ce07d485216c7 103
+  s_b60e4b2c2459cf::t_b672e1b764a670 121,124-125,127,129,132
+  s_d5809ca8528fc6::t_a8d0f4d1ff81a4 97
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "dd3d6df8e0d40dd94b3f70a2397831311179cd3d",
+  "prompts": {},
+  "sessions": {
+    "s_0dc484e502ace4": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0bdcd-7de4-7e11-9618-e603c0d8a351",
+        "model": "gpt-5.4-mini"
+      },
+      "human_author": "jrodeiro5 <jrodeiro.dev@gmail.com>"
+    },
+    "s_1eb63528b4ed89": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a024d7-e803-7df2-aa8a-80b71b805eb3",
+        "model": "gpt-5.4-mini"
+      },
+      "human_author": "jrodeiro5 <jrodeiro.dev@gmail.com>"
+    },
+    "s_b60e4b2c2459cf": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "fab60980-7068-475b-9f20-47f40c036b36",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": "jrodeiro5 <jrodeiro.dev@gmail.com>"
+    },
+    "s_b7f925812e18c4": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a02ee7-0e92-7981-96a2-1a79eed4075a",
+        "model": "gpt-5.4-mini"
+      },
+      "human_author": "jrodeiro5 <jrodeiro.dev@gmail.com>"
+    },
+    "s_c26fcc993ac3c0": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f9004-7e62-7e13-92ce-a72aa5b82b19",
+        "model": "gpt-5.4-mini"
+      },
+      "human_author": "jrodeiro5 <jrodeiro.dev@gmail.com>"
+    },
+    "s_d5809ca8528fc6": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8adf1e60-03cb-40e0-9396-68765eb188ac",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "jrodeiro5 <jrodeiro.dev@gmail.com>"
+    }
+  }
+}

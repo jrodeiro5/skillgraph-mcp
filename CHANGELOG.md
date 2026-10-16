@@ -1,5 +1,23 @@
 # Changelog
 
+## [1.1.0](https://github.com/jrodeiro5/skillgraph-mcp/compare/v1.0.0...v1.1.0) (2026-07-12)
+
+
+### Features
+
+* 20+ server scale — keyword fallback, skill isolation, skill:// resources ([0235bce](https://github.com/jrodeiro5/skillgraph-mcp/commit/0235bce21cd7870e106d05a35aae79218df5106a))
+* auto-rebuild embed index on graph update ([5fbb31e](https://github.com/jrodeiro5/skillgraph-mcp/commit/5fbb31e95adf4f5f191535880c9aaa29ac6c2ea9))
+* **cmd,docs:** generate Claude Code SKILL.md files per downstream skill ([3fd797e](https://github.com/jrodeiro5/skillgraph-mcp/commit/3fd797ee2e056576090100225938dada62af4943))
+* **doctor:** check GitHub Releases for available updates ([e11ef21](https://github.com/jrodeiro5/skillgraph-mcp/commit/e11ef21be0abf5a8d40ee63af732f89837f49a00))
+* embedding-based tool retrieval + fix skill/MCP confusion ([c0a0346](https://github.com/jrodeiro5/skillgraph-mcp/commit/c0a0346bfbbba1e18a882e09dc7254402139630b))
+* **mcpserver:** redirect agents to use_skill when GetServer fails ([886faef](https://github.com/jrodeiro5/skillgraph-mcp/commit/886faef9a1eecd5256e28a63f855b1fe088a5457))
+* safe generate-skills + format-compact line collapse + npm readme fix ([9f9b2cd](https://github.com/jrodeiro5/skillgraph-mcp/commit/9f9b2cdb06de5947e19fc05a0763eb2de57ec37d))
+
+
+### Bug Fixes
+
+* **execute_code:** capture stdout as fallback and preserve partial output on error ([d026c8e](https://github.com/jrodeiro5/skillgraph-mcp/commit/d026c8e5c9142cd31a535ac2327d0dbf52fe2d70))
+
 ## [Unreleased](https://github.com/jrodeiro5/skillgraph-mcp/compare/v1.0.0...HEAD)
 
 

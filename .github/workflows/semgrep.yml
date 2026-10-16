@@ -1,0 +1,28 @@
+name: Semgrep CE scan
+
+on:
+  pull_request: {}
+  workflow_dispatch: {}
+  push:
+    branches: ["master", "main"]
+  schedule:
+    - cron: '15 6 * * 1'
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  semgrep:
+    name: semgrep-oss/scan
+    runs-on: ubuntu-latest
+    container:
+      image: semgrep/semgrep
+    if: (github.actor != 'dependabot[bot]')
+    steps:
+      - uses: actions/checkout@v6
+      - run: semgrep scan --config auto --sarif --output semgrep.sarif
+      - uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: semgrep.sarif

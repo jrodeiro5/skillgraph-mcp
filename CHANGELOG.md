@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.1](https://github.com/jrodeiro5/skillgraph-mcp/compare/v1.1.0...v1.1.1) (2026-10-16)
+
+
+### Bug Fixes
+
+* **openwiki:** stop excluding openwiki/ from its own generator ([1ba8e54](https://github.com/jrodeiro5/skillgraph-mcp/commit/1ba8e54c2e322c2e803fc5420e3eba0244ffcbf1))
+
 ## [1.1.0](https://github.com/jrodeiro5/skillgraph-mcp/compare/v1.0.0...v1.1.0) (2026-07-12)
 
 

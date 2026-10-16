@@ -98,6 +98,16 @@ The refine package directly calls `mcpserver.RebuildGraph`, `mcpserver.AllTools`
 | Change downstream server connection | `internal/mcpserver/server.go` + `manager.go` |
 | Add docs/lattice generation | `internal/docs/lattice.go` |
 
+### Wiki Pages
+
+The repository has a CodeAlmanac wiki under `almanac/` with durable knowledge:
+
+- [Gateway Routing Model](almanac/architecture/gateway-routing) — how the 8 gateway tools work, the execute_code indirection point
+- [Embedding-Based Retrieval](almanac/architecture/embedding-retrieval) — how `find_tools` uses semantic search
+- [npx Cache Corruption](almanac/guides/npx-cache-corruption) — npm 11.x bug and fixes
+
+See `almanac/README.md` for the full wiki.
+
 ### Known footguns
 
 - **Blank child env**: STDIO child processes receive only the env vars in their `env` block — not the parent shell's env. Tests that rely on child processes needing `PATH` will fail unless those vars are passed explicitly.
@@ -113,24 +123,25 @@ When an `npx <package>` downstream server (gitnexus, brave-search, context7, etc
 <!-- gitnexus:start -->
 # GitNexus — Code Intelligence
 
-This project is indexed by GitNexus as **skillgraph-mcp** (1758 symbols, 3372 relationships, 141 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
+This project is indexed by GitNexus as **skillgraph-mcp** (1221 symbols, 3164 relationships, 101 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
 
-> If any GitNexus tool warns the index is stale, run `npx gitnexus analyze` in terminal first.
+> Index stale? Run `node .gitnexus/run.cjs analyze` from the project root — it auto-selects an available runner. No `.gitnexus/run.cjs` yet? `npx gitnexus analyze` (npm 11 crash → `npm i -g gitnexus`; #1939).
 
 ## Always Do
 
-- **MUST run impact analysis before editing any symbol.** Before modifying a function, class, or method, run `gitnexus_impact({target: "symbolName", direction: "upstream"})` and report the blast radius (direct callers, affected processes, risk level) to the user.
-- **MUST run `gitnexus_detect_changes()` before committing** to verify your changes only affect expected symbols and execution flows.
+- **MUST run impact analysis before editing any symbol.** Before modifying a function, class, or method, run `impact({target: "symbolName", direction: "upstream"})` and report the blast radius (direct callers, affected processes, risk level) to the user.
+- **MUST run `detect_changes()` before committing** to verify your changes only affect expected symbols and execution flows. For regression review, compare against the default branch: `detect_changes({scope: "compare", base_ref: "main"})`.
 - **MUST warn the user** if impact analysis returns HIGH or CRITICAL risk before proceeding with edits.
-- When exploring unfamiliar code, use `gitnexus_query({query: "concept"})` to find execution flows instead of grepping. It returns process-grouped results ranked by relevance.
-- When you need full context on a specific symbol — callers, callees, which execution flows it participates in — use `gitnexus_context({name: "symbolName"})`.
+- When exploring unfamiliar code, use `query({search_query: "concept"})` to find execution flows instead of grepping. It returns process-grouped results ranked by relevance.
+- When you need full context on a specific symbol — callers, callees, which execution flows it participates in — use `context({name: "symbolName"})`.
+- For security review, `explain({target: "fileOrSymbol"})` lists taint findings (source→sink flows; needs `analyze --pdg`).
 
 ## Never Do
 
-- NEVER edit a function, class, or method without first running `gitnexus_impact` on it.
+- NEVER edit a function, class, or method without first running `impact` on it.
 - NEVER ignore HIGH or CRITICAL risk warnings from impact analysis.
-- NEVER rename symbols with find-and-replace — use `gitnexus_rename` which understands the call graph.
-- NEVER commit changes without running `gitnexus_detect_changes()` to check affected scope.
+- NEVER rename symbols with find-and-replace — use `rename` which understands the call graph.
+- NEVER commit changes without running `detect_changes()` to check affected scope.
 
 ## Resources
 
@@ -153,3 +164,53 @@ This project is indexed by GitNexus as **skillgraph-mcp** (1758 symbols, 3372 re
 | Index, status, clean, wiki CLI commands | `.claude/skills/gitnexus/gitnexus-cli/SKILL.md` |
 
 <!-- gitnexus:end -->
+
+<!-- OPENWIKI:START -->
+
+## OpenWiki
+
+This repository has a generated `openwiki/` evidence index. It is optional just-in-time context, not required startup reading.
+
+- Treat source code and tests as authoritative. A brief's unknowns and review items are verification gaps, not automatic requirements.
+- Prefer the narrowest quiet validation that proves the changed behavior. Preserve complete failure output.
+
+The local atlas post-commit cascade (see atlas ARCHITECTURE.md) refreshes the repository wiki. Do not hand-edit generated OpenWiki pages unless explicitly asked; prefer updating source code/docs and letting OpenWiki regenerate.
+
+<!-- OPENWIKI:END -->
+
+<!-- atlas:start -->
+## Atlas — machine-wide context
+
+Atlas maps every repo, service and config dir on this machine. This one's entity
+doc carries its role, stack, services, CI state, last commit, and what is
+currently running out of it.
+
+```bash
+qmd get atlas/repos/skillgraph-mcp.md    # this repo's entity doc
+qmd query "<topic>"             # search every repo/service/config on this machine
+```
+
+Also here: `almanac/` = why it was built this way (mined decisions,
+pitfalls, incidents). `openwiki/` = how it works right now (generated from
+current code).
+
+### Qué NO editar aquí
+
+Tres cosas de este repo las escribe la máquina, no tú:
+
+- `openwiki/` — regenerado por el cascade en cada commit (modelo local). Editarlo a
+  mano no se pierde al instante: se pierde en el siguiente commit, sin avisar.
+  ¿Falta algo? Arréglalo en el código o en los docs, y deja que se regenere.
+- `almanac/` — lo mina CodeAlmanac y lo auto-commitea. Tus ediciones van **sólo**
+  bajo su marker `<!-- manual -->`; por encima, se reescriben.
+- `AGENTS.md` — symlink a `CLAUDE.md` (algún repo lo lleva como fichero real, por
+  convención): edita `CLAUDE.md`. El cascade lo sustituye por una copia real mientras
+  genera y lo restaura al terminar, así que un `T` transitorio en `git status` es ese
+  swap, no corrupción.
+
+Los hooks (`pre-commit` = gitleaks, `post-commit` = este cascade) son de atlas y
+compartidos por todos los repos de la máquina: no los edites aquí.
+
+Atlas regenerates the entity doc from scans — hand-edits go below its
+`<!-- manual -->` marker only. Source: ~/dev/infra/atlas.
+<!-- atlas:end -->

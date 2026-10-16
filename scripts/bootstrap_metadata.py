@@ -94,13 +94,13 @@ def refine_description(client, name, kind, schema_or_desc):
     """
     try:
         response = client.chat.completions.create(
-            model="deepseek-chat",
+            model="mimo-v2.6-flash",
             messages=[{"role": "user", "content": prompt}],
             temperature=0.2
         )
         return response.choices[0].message.content.strip()
     except Exception as e:
-        print(f"Error calling DeepSeek API for {name}: {e}", file=sys.stderr)
+        print(f"Error calling Xiaomi MiMo API for {name}: {e}", file=sys.stderr)
         return None
 
 def main():
@@ -118,18 +118,18 @@ def main():
         sys.exit(1)
         
     # Get API key
-    api_key = os.environ.get("DEEPSEEK_API_KEY")
+    api_key = os.environ.get("XIAOMI_SUB_API_KEY")
     if not api_key:
         try:
-            print("Retrieving DeepSeek API key from pass manager...", file=sys.stderr)
-            api_key = subprocess.check_output(["pass", "show", "deepseek/api_key"], text=True).strip()
+            print("Retrieving Xiaomi API key from pass manager...", file=sys.stderr)
+            api_key = subprocess.check_output(["pass", "show", "xiaomi_sub"], text=True).strip()
         except Exception as e:
-            print(f"Error: DEEPSEEK_API_KEY is not set and could not retrieve from pass: {e}", file=sys.stderr)
+            print(f"Error: XIAOMI_SUB_API_KEY is not set and could not retrieve from pass: {e}", file=sys.stderr)
             sys.exit(1)
-            
+
     client = OpenAI(
         api_key=api_key,
-        base_url="https://api.deepseek.com/v1"
+        base_url="https://token-plan-ams.xiaomimimo.com/v1"
     )
     
     descriptions = {}

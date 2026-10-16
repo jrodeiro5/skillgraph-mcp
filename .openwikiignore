@@ -18,3 +18,11 @@ coverage/
 .next/
 .turbo/
 .cache/
+secrets/
+credentials/
+private/
+*.pem
+*.key
+.ssh/
+id_rsa
+id_ed25519

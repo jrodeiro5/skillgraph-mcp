@@ -55,3 +55,8 @@ vendor/
 .act-cache/
 act-event.json
 ara/
+# Artefactos locales de agentes (no versionar)
+.omo/
+.mcp.json
+.claude/settings.local.json
+.scannerwork/
